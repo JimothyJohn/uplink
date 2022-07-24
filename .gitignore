@@ -1,2 +1,6 @@
-.pio
+.pio/
 *.zip
+.vscode/
+test/
+.logs/
+edge-impulse/

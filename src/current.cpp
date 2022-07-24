@@ -10,6 +10,7 @@ Revised 2019-8-6
 By Henry Zhao<henry.zhao@dfrobot.com>
 Adapted 2022-4-16
 By Nick Armenta<nick@advin.io>
+// https://github.com/JimothyJohn/current-monitor/blob/master/src/current.cpp
 */
 
 #include <Arduino.h>
@@ -52,7 +53,9 @@ void setup()
 void loop()
 {
     float ACCurrentValue = readACCurrentValue(); // read AC Current Value
-    Serial.print(ACCurrentValue);
-    Serial.print(",");
-    delay(25);
+    // Edge Impulse requires .csv format
+    // https://docs.edgeimpulse.com/docs/edge-impulse-cli/cli-data-forwarder#protocol
+    Serial.println(ACCurrentValue);
+    // 50ms is >18Hz, the maximum sample rate of Edge Impulse
+    delay(50);
 }

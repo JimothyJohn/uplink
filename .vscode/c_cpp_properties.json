@@ -1,3 +1,8 @@
+//
+// !!! WARNING !!! AUTO-GENERATED FILE!
+// PLEASE DO NOT MODIFY IT AND USE "platformio.ini":
+// https://docs.platformio.org/page/projectconf/section_env_build.html#build-flags
+//
 {
     "configurations": [
         {
@@ -5,10 +10,6 @@
             "includePath": [
                 "/home/nick/github/current-monitor/include",
                 "/home/nick/github/current-monitor/src",
-                "/home/nick/github/current-monitor/.pio/libdeps/esp-wrover-kit/ESP8266 Influxdb/src",
-                "/home/nick/.platformio/packages/framework-arduinoespressif32/libraries/HTTPClient/src",
-                "/home/nick/.platformio/packages/framework-arduinoespressif32/libraries/WiFiClientSecure/src",
-                "/home/nick/.platformio/packages/framework-arduinoespressif32/libraries/WiFi/src",
                 "/home/nick/.platformio/packages/framework-arduinoespressif32/tools/sdk/esp32/include/config",
                 "/home/nick/.platformio/packages/framework-arduinoespressif32/tools/sdk/esp32/include/newlib/platform_include",
                 "/home/nick/.platformio/packages/framework-arduinoespressif32/tools/sdk/esp32/include/freertos/include",
@@ -197,6 +198,7 @@
                 "/home/nick/.platformio/packages/framework-arduinoespressif32/libraries/Ethernet/src",
                 "/home/nick/.platformio/packages/framework-arduinoespressif32/libraries/FFat/src",
                 "/home/nick/.platformio/packages/framework-arduinoespressif32/libraries/FS/src",
+                "/home/nick/.platformio/packages/framework-arduinoespressif32/libraries/HTTPClient/src",
                 "/home/nick/.platformio/packages/framework-arduinoespressif32/libraries/HTTPUpdate/src",
                 "/home/nick/.platformio/packages/framework-arduinoespressif32/libraries/HTTPUpdateServer/src",
                 "/home/nick/.platformio/packages/framework-arduinoespressif32/libraries/I2S/src",
@@ -213,9 +215,10 @@
                 "/home/nick/.platformio/packages/framework-arduinoespressif32/libraries/USB/src",
                 "/home/nick/.platformio/packages/framework-arduinoespressif32/libraries/Update/src",
                 "/home/nick/.platformio/packages/framework-arduinoespressif32/libraries/WebServer/src",
+                "/home/nick/.platformio/packages/framework-arduinoespressif32/libraries/WiFi/src",
+                "/home/nick/.platformio/packages/framework-arduinoespressif32/libraries/WiFiClientSecure/src",
                 "/home/nick/.platformio/packages/framework-arduinoespressif32/libraries/WiFiProv/src",
                 "/home/nick/.platformio/packages/framework-arduinoespressif32/libraries/Wire/src",
-                "/home/nick/.platformio/packages/tool-unity",
                 ""
             ],
             "browse": {
@@ -223,10 +226,6 @@
                 "path": [
                     "/home/nick/github/current-monitor/include",
                     "/home/nick/github/current-monitor/src",
-                    "/home/nick/github/current-monitor/.pio/libdeps/esp-wrover-kit/ESP8266 Influxdb/src",
-                    "/home/nick/.platformio/packages/framework-arduinoespressif32/libraries/HTTPClient/src",
-                    "/home/nick/.platformio/packages/framework-arduinoespressif32/libraries/WiFiClientSecure/src",
-                    "/home/nick/.platformio/packages/framework-arduinoespressif32/libraries/WiFi/src",
                     "/home/nick/.platformio/packages/framework-arduinoespressif32/tools/sdk/esp32/include/config",
                     "/home/nick/.platformio/packages/framework-arduinoespressif32/tools/sdk/esp32/include/newlib/platform_include",
                     "/home/nick/.platformio/packages/framework-arduinoespressif32/tools/sdk/esp32/include/freertos/include",
@@ -415,6 +414,7 @@
                     "/home/nick/.platformio/packages/framework-arduinoespressif32/libraries/Ethernet/src",
                     "/home/nick/.platformio/packages/framework-arduinoespressif32/libraries/FFat/src",
                     "/home/nick/.platformio/packages/framework-arduinoespressif32/libraries/FS/src",
+                    "/home/nick/.platformio/packages/framework-arduinoespressif32/libraries/HTTPClient/src",
                     "/home/nick/.platformio/packages/framework-arduinoespressif32/libraries/HTTPUpdate/src",
                     "/home/nick/.platformio/packages/framework-arduinoespressif32/libraries/HTTPUpdateServer/src",
                     "/home/nick/.platformio/packages/framework-arduinoespressif32/libraries/I2S/src",
@@ -431,14 +431,15 @@
                     "/home/nick/.platformio/packages/framework-arduinoespressif32/libraries/USB/src",
                     "/home/nick/.platformio/packages/framework-arduinoespressif32/libraries/Update/src",
                     "/home/nick/.platformio/packages/framework-arduinoespressif32/libraries/WebServer/src",
+                    "/home/nick/.platformio/packages/framework-arduinoespressif32/libraries/WiFi/src",
+                    "/home/nick/.platformio/packages/framework-arduinoespressif32/libraries/WiFiClientSecure/src",
                     "/home/nick/.platformio/packages/framework-arduinoespressif32/libraries/WiFiProv/src",
                     "/home/nick/.platformio/packages/framework-arduinoespressif32/libraries/Wire/src",
-                    "/home/nick/.platformio/packages/tool-unity",
                     ""
                 ]
             },
             "defines": [
-                "PLATFORMIO=50205",
+                "PLATFORMIO=60002",
                 "ARDUINO_ESP32_DEV",
                 "HAVE_CONFIG_H",
                 "MBEDTLS_CONFIG_FILE=\"mbedtls/esp_config.h\"",
@@ -463,8 +464,7 @@
             "compilerArgs": [
                 "-mlongcalls",
                 ""
-            ],
-            "configurationProvider": "nrf-connect"
+            ]
         }
     ],
     "version": 4
