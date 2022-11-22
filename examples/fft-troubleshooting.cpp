@@ -26,7 +26,7 @@
 #define JSON_SIZE 1024
 #define MQTT_MAX_PACKET_SIZE 1024
 
-#define DEBUG true 
+#define DEBUG true
 
 // Dual-core tasks
 TaskHandle_t MQTTHandler;
@@ -49,15 +49,14 @@ unsigned long currentTime;
 #define SCL_TIME 0x01
 #define SCL_FREQUENCY 0x02
 #define SCL_PLOT 0x03
-const float signalFrequency = 0.167;
-const float samplingFrequency = 20;
-const uint8_t samplingDelay = static_cast<uint8_t>(1000/samplingFrequency);
-const uint16_t samples = 128; // This value MUST ALWAYS be a power of 2
+const double signalFrequency = 0.167;
+const double samplingFrequency = 20;
+const uint16_t fftsamples = 128; // This value MUST ALWAYS be a power of 2
 
 void print_index(uint8_t scaleType)
 {
-  float abscissa;
-  uint8_t finalSamples = samples;
+  double abscissa;
+  uint16_t samples = fftsamples; // This value MUST ALWAYS be a power of 2
   // Print abscissa value
   switch (scaleType)
   {
@@ -69,11 +68,11 @@ void print_index(uint8_t scaleType)
     break;
   case SCL_FREQUENCY:
     Serial.print("Frequency (Hz),");
-    finalSamples /= 2;
+    samples /= 2;
     break;
   }
 
-  for (uint16_t i = 0; i < finalSamples; i++)
+  for (uint16_t i = 0; i < samples; i++)
   {
     // Print abscissa value
     switch (scaleType)
@@ -85,7 +84,7 @@ void print_index(uint8_t scaleType)
       abscissa = ((i * 1.0) / samplingFrequency);
       break;
     case SCL_FREQUENCY:
-      abscissa = ((i * 1.0 * samplingFrequency) / finalSamples);
+      abscissa = ((i * 1.0 * samplingFrequency) / fftsamples);
       break;
     }
     Serial.print(abscissa, 2);
@@ -96,7 +95,7 @@ void print_index(uint8_t scaleType)
 
 void PrintVector(double *vData, uint16_t bufferSize, uint8_t scaleType)
 {
-  float sentValue = vData[0];
+  double sentValue = vData[0];
   for (uint16_t i = 0; i < bufferSize; i++)
   {
     sentValue = vData[i];
@@ -116,10 +115,10 @@ void print_setup() {
   Serial.print(",");
   Serial.print(samplingFrequency);
   Serial.print(",");
-  Serial.println(samples/samplingFrequency);
+  Serial.println(fftsamples/samplingFrequency);
 }
 
-void run_fft(double vReal[samples])
+double run_fft()
 {
   arduinoFFT FFT = arduinoFFT(); /* Create FFT object */
 
@@ -129,55 +128,49 @@ void run_fft(double vReal[samples])
   Input vectors receive computed results from FFT
   */
   // Replace vReal with ACTUAL data
-  double vImag[samples];
-  float energy = 0;
+  double vReal[fftsamples];
+  double vImag[fftsamples];
+  double energy = 0;
   double peak = 0;
-  float mean;
 
   /* Build raw data */
-  float cycles = (((samples - 1) * signalFrequency) / samplingFrequency); // Number of signal cycles that the sampling will read
-  for (uint16_t i = 0; i < samples; i++)
+  double cycles = (((fftsamples - 1) * signalFrequency) / samplingFrequency); // Number of signal cycles that the sampling will read
+  for (uint16_t i = 0; i < fftsamples; i++)
   {
-    // vReal[i] = int8_t((amplitude * (sin((i * (twoPi * cycles)) / samples))) / 2.0); /* Build data with positive and negative values*/
+    vReal[i] = int8_t((amplitude * (sin((i * (twoPi * cycles)) / fftsamples))) / 2.0); /* Build data with positive and negative values*/
     // Modulate by quadruple the frequency
-    // vReal[i] += int8_t((amplitude/5 * (sin((4 * i * (twoPi * cycles)) / samples))) / 2.0); /* Build data with positive and negative values*/
+    vReal[i] += int8_t((amplitude/5 * (sin((4 * i * (twoPi * cycles)) / fftsamples))) / 2.0); /* Build data with positive and negative values*/
     // Modulate and phase by doubling the frequency
-    // vReal[i] -= int8_t((amplitude/2 * (sin((0.2 + 5 * i * (twoPi * cycles)) / samples))) / 2.0); /* Build data with positive and negative values*/
+    vReal[i] -= int8_t((amplitude/5 * (sin((0.1 + 2 * i * (twoPi * cycles)) / fftsamples))) / 2.0); /* Build data with positive and negative values*/
     // vReal[i] = uint8_t((amplitude * (sin((i * (twoPi * cycles)) / samples) + 1.0)) / 2.0);/* Build data displaced on the Y axis to include only positive values*/
     vImag[i] = 0.0; // Imaginary part must be zeroed in case of looping to avoid wrong calculations and overflows
     energy += abs(vReal[i]);
     peak = max(abs(vReal[i]), peak);
   }
   energy /= samplingFrequency;
-  mean = energy / samples;
+  double mean = energy / fftsamples;
   /*
-  float stddev;
-  for (uint16_t i = 0; i < samples; i++)
+  double stddev;
+  for (uint16_t i = 0; i < fftsamples; i++)
   {
-    stddev += sqrt(pow(vReal[i] - mean,2) / samples);
+    stddev += sqrt(pow(vReal[i] - mean,2) / fftsamples);
   }
   */
   /* Print the results of the simulated sampling according to time */
-  if (DEBUG)
-  {
-    print_index(SCL_TIME);
-    Serial.print("Reading,");
-    PrintVector(vReal, samples, SCL_TIME);
-  }
-  FFT.Windowing(vReal, samples, FFT_WIN_TYP_HAMMING, FFT_FORWARD); /* Weigh data */
-  FFT.Compute(vReal, vImag, samples, FFT_FORWARD); /* Compute FFT */
-  FFT.ComplexToMagnitude(vReal, vImag, samples); /* Compute magnitudes */
-  if (DEBUG)
-  {
-    print_index(SCL_FREQUENCY);
-    Serial.print("Magnitudes,");
-    PrintVector(vReal, (samples >> 1), SCL_FREQUENCY);
-  }
-
-  doc["res"] = FFT.MajorPeak(vReal, samples, samplingFrequency);
-  doc["energy"] = energy * 0.170;
+  doc["energy"] = energy*170;
   doc["peak"] = peak;
-  doc["rms"] = mean;
+  doc["rms"] = energy / fftsamples;
+
+  print_index(SCL_TIME);
+  Serial.print("Reading,");
+  PrintVector(vReal, fftsamples, SCL_TIME);
+  FFT.Windowing(vReal, fftsamples, FFT_WIN_TYP_HAMMING, FFT_FORWARD); /* Weigh data */
+  FFT.Compute(vReal, vImag, fftsamples, FFT_FORWARD); /* Compute FFT */
+  FFT.ComplexToMagnitude(vReal, vImag, fftsamples); /* Compute magnitudes */
+  print_index(SCL_FREQUENCY);
+  Serial.print("Magnitudes,");
+  PrintVector(vReal, (fftsamples >> 1), SCL_FREQUENCY);
+  doc["max_freq"] = FFT.MajorPeak(vReal, fftsamples, samplingFrequency);
 }
 
 // Initialize Wi-Fi manager and connect to Wi-Fi
@@ -235,11 +228,11 @@ void reconnect()
   }
 }
 
-double get_current()
+float get_current()
 {
-  double peakVoltage = analogRead(ACPIN);
+  float peakVoltage = analogRead(ACPIN);
   // change the peak voltage to the Virtual Value of voltage
-  double voltageVirtualValue = peakVoltage * 0.707;
+  float voltageVirtualValue = peakVoltage * 0.707;
   /*The circuit is amplified by 2 times, so it is divided by 2.*/
   voltageVirtualValue = (voltageVirtualValue / 1024 * VREF) / 2;
   return voltageVirtualValue * ACRANGE;
@@ -250,46 +243,51 @@ void MQTTProcess(void *pvParameters)
 {
   // Serial.print("MQTT task running on core ");
   // Serial.println(xPortGetCoreID());
-  char buffer[JSON_SIZE];
-  const char *topic = "/jimothyjohn/current-monitor/test";
-  double readings[samples];
 
+  char buffer[JSON_SIZE];
+  
+  float sampleFreq = 20;
+  float sampleTime = 1;
+  uint8_t samples = static_cast<uint8_t>(sampleFreq * sampleTime);
+  uint8_t timeGap = static_cast<uint8_t>(1000 / sampleFreq);
+
+  const char *topic = "/jimothyjohn/current-monitor/test";
   doc["device_name"] = "Olimex";
   doc["device_id"] = 0;
   doc["measurement"] = "current";
   doc["units"] = "A";
-  doc["freq"] = samplingFrequency;
+  doc["freq"] = sampleFreq;
+  JsonArray readings = doc.createNestedArray("readings");
   size_t n = serializeJson(doc, buffer);
 
   print_setup();
+  currentTime = millis();
+  Serial.println("Processing time (ms)");
+  Serial.println(millis()-currentTime);
 
   for (;;)
   {
+    
+    // ArduinoOTA.handle()
     if (!pubsubClient.connected())
     {
       reconnect();
     }
     else
     {
-      for (int i = 0; i < samples; i++)
-      {
-        readings[i] = get_current();
-        delay(samplingDelay);
-      }
-
-      run_fft(readings);
-
+      run_fft();
       n = serializeJson(doc, buffer);
-      
+ 
       if (!pubsubClient.publish(topic, buffer, n))
       {
         Serial.println(buffer);
         Serial.print("Unable to send to ");
         Serial.println(topic);
       }
+      
       pubsubClient.loop();
-      // DELETING THIS DELAY WILL CRASH THE MCU
-      delay(20);
+      // DELETING THIS DELAY COULD CRASH THE MCU
+      delay(1000);
     }
   }
 }
