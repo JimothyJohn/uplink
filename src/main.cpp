@@ -15,7 +15,7 @@
 #define DEVICE "ESP8266"
 #endif
 
-#define ACPIN 36
+const uint8_t ACPIN = 32;
 // set Non-invasive AC Current Sensor tection range
 #define ACRANGE 20
 
@@ -43,15 +43,16 @@ float ACCurrentValue = 0;
 
 // Current time
 unsigned long startTime = millis();
-unsigned long currentTime;
+unsigned long currentTime = millis();
 
 #define SCL_INDEX 0x00
 #define SCL_TIME 0x01
 #define SCL_FREQUENCY 0x02
 #define SCL_PLOT 0x03
-const float signalFrequency = 0.167;
-const float samplingFrequency = 20;
-const uint8_t samplingDelay = static_cast<uint8_t>(1000/samplingFrequency);
+const float signalFrequency = 0.567;
+const float samplingFrequency = 16;
+const uint8_t smoothingFactor = 4;
+const uint8_t samplingDelay = static_cast<uint8_t>(1000 / samplingFrequency / smoothingFactor);
 const uint16_t samples = 128; // This value MUST ALWAYS be a power of 2
 
 void print_index(uint8_t scaleType)
@@ -112,7 +113,7 @@ void PrintVector(double *vData, uint16_t bufferSize, uint8_t scaleType)
 
 void print_setup() {
   Serial.println("Ground Truth (Hz),Sample Rate (Hz),Sample Length (ms)");
-  Serial.print(signalFrequency);
+  Serial.print("Running");
   Serial.print(",");
   Serial.print(samplingFrequency);
   Serial.print(",");
@@ -131,33 +132,30 @@ void run_fft(double vReal[samples])
   // Replace vReal with ACTUAL data
   double vImag[samples];
   float energy = 0;
-  double peak = 0;
-  float mean;
+  double a_max = 0;
+  double a_rms = 0;
+  double freq_max = 0;
+  double freq_rms = 0;
 
   /* Build raw data */
   float cycles = (((samples - 1) * signalFrequency) / samplingFrequency); // Number of signal cycles that the sampling will read
   for (uint16_t i = 0; i < samples; i++)
   {
-    // vReal[i] = int8_t((amplitude * (sin((i * (twoPi * cycles)) / samples))) / 2.0); /* Build data with positive and negative values*/
+    vReal[i] = int8_t((amplitude * (sin((i * (twoPi * cycles)) / samples))) / 2.0); /* Build data with positive and negative values*/
     // Modulate by quadruple the frequency
-    // vReal[i] += int8_t((amplitude/5 * (sin((4 * i * (twoPi * cycles)) / samples))) / 2.0); /* Build data with positive and negative values*/
+    vReal[i] += int8_t((amplitude/5 * (sin((4 * i * (twoPi * cycles)) / samples))) / 2.0); /* Build data with positive and negative values*/
     // Modulate and phase by doubling the frequency
-    // vReal[i] -= int8_t((amplitude/2 * (sin((0.2 + 5 * i * (twoPi * cycles)) / samples))) / 2.0); /* Build data with positive and negative values*/
+    vReal[i] -= int8_t((amplitude/2 * (sin((0.2 + 5 * i * (twoPi * cycles)) / samples))) / 2.0); /* Build data with positive and negative values*/
     // vReal[i] = uint8_t((amplitude * (sin((i * (twoPi * cycles)) / samples) + 1.0)) / 2.0);/* Build data displaced on the Y axis to include only positive values*/
     vImag[i] = 0.0; // Imaginary part must be zeroed in case of looping to avoid wrong calculations and overflows
     energy += abs(vReal[i]);
-    peak = max(abs(vReal[i]), peak);
+    a_max = max(abs(vReal[i]), a_max);
+    a_rms += pow(vReal[i], 2);
   }
   energy /= samplingFrequency;
-  mean = energy / samples;
-  /*
-  float stddev;
-  for (uint16_t i = 0; i < samples; i++)
-  {
-    stddev += sqrt(pow(vReal[i] - mean,2) / samples);
-  }
-  */
-  /* Print the results of the simulated sampling according to time */
+  a_rms = sqrt(a_rms / samples);
+
+  // Print the results of the simulated sampling according to time
   if (DEBUG)
   {
     print_index(SCL_TIME);
@@ -174,10 +172,19 @@ void run_fft(double vReal[samples])
     PrintVector(vReal, (samples >> 1), SCL_FREQUENCY);
   }
 
-  doc["res"] = FFT.MajorPeak(vReal, samples, samplingFrequency);
+  for (uint16_t i = 0; i < samples; i++)
+  {
+    freq_max = max(abs(vReal[i]), freq_max);
+    freq_rms += pow(vReal[i], 2);
+  }
+  freq_rms = sqrt(freq_rms / samples);
+
+  doc["peak_hz"] = FFT.MajorPeak(vReal, samples, samplingFrequency);
   doc["energy"] = energy * 0.170;
-  doc["peak"] = peak;
-  doc["rms"] = mean;
+  doc["a_max"] = a_max;
+  doc["a_rms"] = a_rms;
+  doc["freq_max"] = freq_max;
+  doc["freq_rms"] = freq_rms;
 }
 
 // Initialize Wi-Fi manager and connect to Wi-Fi
@@ -253,12 +260,14 @@ void MQTTProcess(void *pvParameters)
   char buffer[JSON_SIZE];
   const char *topic = "/jimothyjohn/current-monitor/test";
   double readings[samples];
+  double readingSamples;
 
   doc["device_name"] = "Olimex";
   doc["device_id"] = 0;
   doc["measurement"] = "current";
   doc["units"] = "A";
-  doc["freq"] = samplingFrequency;
+  doc["sample_rate"] = samplingFrequency;
+  
   size_t n = serializeJson(doc, buffer);
 
   print_setup();
@@ -273,12 +282,20 @@ void MQTTProcess(void *pvParameters)
     {
       for (int i = 0; i < samples; i++)
       {
-        readings[i] = get_current();
-        delay(samplingDelay);
+        readingSamples = 0.0;
+        for (uint8_t j = 0; j < smoothingFactor; j++)
+        {
+          readingSamples += get_current();
+          // TODO Convert to uint8_t
+          delay(samplingDelay);
+        }
+        readings[i] = readingSamples / smoothingFactor;
       }
 
       run_fft(readings);
 
+      // currentTime = millis();
+      // doc["timestamp"] = currentTime;
       n = serializeJson(doc, buffer);
       
       if (!pubsubClient.publish(topic, buffer, n))
