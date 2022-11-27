@@ -18,8 +18,10 @@ This code has only been tested on an [ESP32](https://www.olimex.com/Products/IoT
 
 ## To-do
 
-[x] Connect to external MQTT Broker    
+[x] Connect to external MQTT Broker (AWS IoT) 
 [x] Analyze waveforms on device
+[x] Commission AWS Thing with Terraform 
 [ ] Conform to [Sparkplug B](https://s3.amazonaws.com/cirrus-link-com/Sparkplug+Specification+Version+1.0.pdf) spec
 [ ] NFC-powered mobile configuration
-[ ] Improve Quickstart platform compatibility 
+[ ] Improve Quickstart platform compatibility (for developers) 
+[ ] Create user manual

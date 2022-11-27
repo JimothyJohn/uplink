@@ -1,16 +1,12 @@
 // Load relevant librariPrettyPrettyPrettyPrettyPrettyPrettyPrettyPrettyPrettyPrettyPrettyPrettyPrettyPrettyPrettyes
 #include <Arduino.h>         //Base framework
-// TODO: Security - Remove Wi-Fi functionality
-#include <ESP_WiFiManager.h> // AP login and maintenance
-#include <ESPmDNS.h>         // Connect by hostname
+#include <WiFiClientSecure.h>
 // Load relevant libraries
-#include <FS.h>              // Get FS functions
 #include <SPIFFS.h>          // Enable file system
-#include <PubSubClient.h>    // Enable MQTT
-#include <HTTPClient.h>      // Extract object data
+#include <MQTTClient.h>    // Enable MQTT
 #include <ArduinoJson.h>     // Handle JSON messages
 #include <arduinoFFT.h>      // Spectrum analysis
-#include "certs.h"
+#include "secrets.h"
 
 // Current sensor detection range
 #define ACRANGE 20
@@ -19,8 +15,8 @@
 #define VREF 3.3
 
 // Allow for larger JSON and MQTT messages
-#define JSON_SIZE 1024
-#define MQTT_MAX_PACKET_SIZE 1024
+#define JSON_SIZE 1024 
+#define MQTT_MAX_PACKET_SIZE 2048 
 
 // Allow for more verbose outputs
 #if DEBUG
@@ -45,10 +41,9 @@ TaskHandle_t MQTTHandler;
 TaskHandle_t CurrentHandler;
 
 // Network clients
-// TODO Replace Wi-Fi with Ethernet client
-static WiFiClient wifiClient;
-static PubSubClient pubsubClient(wifiClient);
-uint16_t port = 1883;
+WiFiClientSecure net = WiFiClientSecure();
+MQTTClient client = MQTTClient(JSON_SIZE);
+uint16_t port = 8883;
 
 // Simulated signal frequency (DEBUG only)
 const float signalFrequency = 5.567;
@@ -69,14 +64,14 @@ double peak_hz;
 
 // Sparkplug B Topic Initalizer
 // namespace = company name
-char nspace[32] = "Armenta";
+char nspace[] = "Armenta";
 // grouo_id = business unit
-char group_id[32] = "Home";
-char message_type[32] = "signal";
+char group_id[] = "Home";
+char message_type[] = "signal";
 // edge_node_id = location
-char edge_node_id[32] = "Bedford";
+char edge_node_id[] = "Bedford";
 // device_id = machine name 
-char device_id[32] = "uptime";
+char device_id[] = "uptime";
 char topic[128];
  
 void print_index(uint8_t scaleType)
@@ -208,60 +203,53 @@ void run_fft(double vReal[samples])
 
 }
 
-// Initialize Wi-Fi manager and connect to Wi-Fi
-// https://github.com/khoih-prog/ESP_WiFiManager
-// TODO Replace with Ethernet
-void SetupWiFi()
-{
-  ESP_WiFiManager wm("uServer");
-  wm.autoConnect("uServer");
-  if (!WiFi.status() == WL_CONNECTED)
-  {
-    Serial.println(wm.getStatus(WiFi.status()));
-  }
+void messageHandler(String &topic, String &payload) {
+  Serial.println("incoming: " + topic + " - " + payload);
+
+//  StaticJsonDocument<200> doc;
+//  deserializeJson(doc, payload);
+//  const char* message = doc["message"];
 }
 
-// Message received callback function
-// TODO Put to use
-// https://github.com/knolleary/pubsubclient/blob/master/examples/mqtt_basic/mqtt_basic.ino
-void callback(char *topic, uint8_t *payload, unsigned int length)
+void connectAWS()
 {
-  // Create spot in memory for message
-  char message[length + 1];
-  // Write payload to String
-  strncpy(message, (char *)payload, length);
-  // Nullify last character to eliminate garbage at end
-  message[length] = '\0';
+  WiFi.mode(WIFI_STA);
+  WiFi.begin(WIFI_SSID, WIFI_PASSWORD);
 
-  // Create correct object
-  Serial.print("Received \"");
-  Serial.print(message);
-  Serial.print("\" from ");
-  Serial.println(topic);
-}
+  Serial.println("Connecting to Wi-Fi");
 
-// Connect to MQTT brokeer
-void reconnect(const char hostname[], char topic[128])
-{
-  // Connect and set callback function
-  pubsubClient.setServer(hostname, port);
-  pubsubClient.setCallback(callback);
-
-  // Create a random client ID
-  String clientId = "ESP32-";
-  clientId += String(random(0xffff), HEX);
-  // Attempt to connect
-  if (pubsubClient.connect(clientId.c_str()))
-  {
-    // TODO Add variable topic and finalize hello message
-    pubsubClient.publish(topic, "Born again");
+  while (WiFi.status() != WL_CONNECTED){
+    delay(500);
+    Serial.print(".");
   }
-  else
-  {
-    Serial.print("failed, rc=");
-    Serial.print(pubsubClient.state());
-    delay(1000);
+
+  // Configure WiFiClientSecure to use the AWS IoT device credentials
+  net.setCACert(AWS_CERT_CA);
+  net.setCertificate(AWS_CERT_CRT);
+  net.setPrivateKey(AWS_CERT_PRIVATE);
+
+  // Connect to the MQTT broker on the AWS endpoint we defined earlier
+  client.begin(AWS_IOT_ENDPOINT, 8883, net);
+
+  // Create a message handler
+  client.onMessage(messageHandler);
+
+  Serial.print("Connecting to AWS IOT");
+
+  while (!client.connect(THINGNAME)) {
+    Serial.print(".");
+    delay(100);
   }
+
+  if(!client.connected()){
+    Serial.println("AWS IoT Timeout!");
+    return;
+  }
+
+  // Subscribe to a topic
+  client.subscribe(AWS_IOT_SUBSCRIBE_TOPIC);
+
+  Serial.println("AWS IoT Connected!");
 }
 
 double get_current()
@@ -285,8 +273,6 @@ void MQTTProcess(void *pvParameters)
   Core 0 process
   Acquires signal sample and publishes
   measurements as JSON over MQTT 
-  // Serial.print("MQTT task running on core ");
-  // Serial.println(xPortGetCoreID());
   */
   
   StaticJsonDocument<JSON_SIZE> doc;
@@ -299,19 +285,23 @@ void MQTTProcess(void *pvParameters)
   double readingSamples;
   
   // Initialize global JSON doc
-  doc["sample_rate"] = samplingFrequency;
+  doc["fs"] = samplingFrequency;
+  doc["a_lim"] = 20;
   doc["cycle_time"] = 4;
-  doc["hourly_cost"] = 1000;
-  doc["units"] = "Hz";
- 
+  doc["cost_hr"] = 1000;
+  doc["mfgr"] = "custom";
+  doc["model"] = "custom";
+  doc["yr"] = 2022;
+  doc["process"] = "manufacturing";
+
   size_t n;
 
   for (;;)
   {
     // Make sure MQTT client is connected
-    if (!pubsubClient.connected())
+    if (!client.connected())
     {
-      reconnect(hostname, topic);
+      connectAWS();
     }
     else
     {
@@ -343,14 +333,16 @@ void MQTTProcess(void *pvParameters)
       // Prepare JSON message
       n = serializeJson(doc, buffer);
       
-      if (!pubsubClient.publish(topic, buffer, n))
+      // client.publish(AWS_IOT_PUBLISH_TOPIC, buffer);
+      if (!client.publish(AWS_IOT_PUBLISH_TOPIC, buffer, n))
       {
         // Only report errors
         Serial.println(buffer);
         Serial.print("Unable to send to ");
-        Serial.println(topic);
+        Serial.println(AWS_IOT_PUBLISH_TOPIC);
       }
-      pubsubClient.loop();
+
+      client.loop();
       // DELETING THIS DELAY WILL CRASH THE MCU
       delay(20);
     }
@@ -377,21 +369,6 @@ void setup()
   Serial.begin(115200);
   while (!Serial)
     ;
-
-  // Give device monitor time to connect
-  // delay(2000);
-
-  // Uses soft AP to connect to Wi-Fi (if saved credentials aren't valid)
-  // TODO replace with Ethernet
-  SetupWiFi();
-
-  // mDNS allows for connection at http://userver.local/
-  // TODO Remove once Ethernet is in place
-  if (!MDNS.begin("userver"))
-  {
-    Serial.println("Error starting mDNS!");
-    ESP.restart();
-  }
 
   // Initialize SPIFFS
   if (!SPIFFS.begin(true))

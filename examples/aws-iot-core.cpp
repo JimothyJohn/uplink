@@ -1,3 +1,4 @@
+// Source: https://aws.amazon.com/blogs/compute/building-an-aws-iot-core-device-using-aws-serverless-and-an-esp32/
 #include "secrets.h"
 #include "WiFi.h"
 #include <WiFiClientSecure.h>
