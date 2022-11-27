@@ -1,11 +1,11 @@
-# Power Cycle Monitoring
+# Uptime
 
-Experiment in analyzing input current of a power system.
+Monitor machinery status with a simple microcontroller.
 
 ## Quickstart (Linux or Mac)
 
 ```bash
-utils/Quickstart.sh
+bash utils/Quickstart.sh
 ```
 
 ## Prerequisites
@@ -19,5 +19,7 @@ This code has only been tested on an [ESP32](https://www.olimex.com/Products/IoT
 ## To-do
 
 [x] Connect to external MQTT Broker    
-[ ] Analyze waveforms on device
-[ ] Add mobile connection method
+[x] Analyze waveforms on device
+[ ] Conform to [Sparkplug B](https://s3.amazonaws.com/cirrus-link-com/Sparkplug+Specification+Version+1.0.pdf) spec
+[ ] NFC-powered mobile configuration
+[ ] Improve Quickstart platform compatibility 

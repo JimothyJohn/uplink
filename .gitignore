@@ -1,9 +1,11 @@
 .pio/
 *.zip
 .vscode/
-test/
 .logs/
 edge-impulse/
+firmware/
 tmp/
-tests/*
 dev/
+include/*
+.pytest_cache/
+

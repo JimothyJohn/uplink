@@ -1,7 +1,7 @@
 version: "3.8"
 services:
-  userver-api:
-    build: ./api
+  uptime-test:
+    build: .
     restart: unless-stopped
-    ports:
-      - "8000:8000"
+    devices:
+      - "/dev/ttyUSB0:/dev/ttyUSB0"

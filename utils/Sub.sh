@@ -1,3 +1,3 @@
 #!/usr/bin/env bash
 
-mosquitto_sub -h broker.hivemq.com -t /jimothyjohn/current-monitor/test
+mosquitto_sub -h broker.hivemq.com -t Armenta/Home/signal/Bedford/uptime
