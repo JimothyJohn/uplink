@@ -1,12 +1,14 @@
 // Load relevant librariPrettyPrettyPrettyPrettyPrettyPrettyPrettyPrettyPrettyPrettyPrettyPrettyPrettyPrettyPrettyes
-#include <Arduino.h>         //Base framework
 #include <WiFiClientSecure.h>
 // Load relevant libraries
 #include <SPIFFS.h>          // Enable file system
-#include <MQTTClient.h>    // Enable MQTT
+#include <MQTTClient.h>      // Enable MQTT
 #include <ArduinoJson.h>     // Handle JSON messages
 #include <arduinoFFT.h>      // Spectrum analysis
+#include <EEPROM.h>          // Save config to flash
+#include <ST25DVSensor.h>    // Read from NFC tag
 #include "secrets.h"
+#include "uptime.h"
 
 // Current sensor detection range
 #define ACRANGE 20
@@ -16,7 +18,8 @@
 
 // Allow for larger JSON and MQTT messages
 #define JSON_SIZE 1024 
-#define MQTT_MAX_PACKET_SIZE 2048 
+#define MQTT_MAX_PACKET_SIZE 1024 
+#define EEPROM_SIZE 512 
 
 // Allow for more verbose outputs
 #if DEBUG
@@ -43,11 +46,10 @@ TaskHandle_t CurrentHandler;
 // Network clients
 WiFiClientSecure net = WiFiClientSecure();
 MQTTClient client = MQTTClient(JSON_SIZE);
-uint16_t port = 8883;
 
 // Simulated signal frequency (DEBUG only)
-const float signalFrequency = 5.567;
-const uint8_t amplitude = 100;
+const float signalFrequency = 1.567;
+const uint8_t amplitude = 130;
 // Measurement parameters
 const float samplingFrequency = 16;
 const uint8_t smoothingFactor = 4;
@@ -62,18 +64,18 @@ double freq_max;
 double freq_rms;
 double peak_hz;
 
-// Sparkplug B Topic Initalizer
-// namespace = company name
-char nspace[] = "Armenta";
-// grouo_id = business unit
-char group_id[] = "Home";
-char message_type[] = "signal";
-// edge_node_id = location
-char edge_node_id[] = "Bedford";
-// device_id = machine name 
-char device_id[] = "uptime";
-char topic[128];
- 
+char topic[256];
+
+Sparkplug config;
+
+Sparkplug oldconfig {
+  "Armenta",
+  "Home",
+  "signal",
+  "Bedford",
+  "uptime"
+};
+
 void print_index(uint8_t scaleType)
 {
   /*
@@ -229,7 +231,7 @@ void connectAWS()
   net.setPrivateKey(AWS_CERT_PRIVATE);
 
   // Connect to the MQTT broker on the AWS endpoint we defined earlier
-  client.begin(AWS_IOT_ENDPOINT, 8883, net);
+  client.begin(MQTT_SERVER, MQTT_PORT, net);
 
   // Create a message handler
   client.onMessage(messageHandler);
@@ -240,6 +242,7 @@ void connectAWS()
     Serial.print(".");
     delay(100);
   }
+  Serial.println(".");
 
   if(!client.connected()){
     Serial.println("AWS IoT Timeout!");
@@ -247,7 +250,7 @@ void connectAWS()
   }
 
   // Subscribe to a topic
-  client.subscribe(AWS_IOT_SUBSCRIBE_TOPIC);
+  // client.subscribe(AWS_IOT_SUBSCRIBE_TOPIC);
 
   Serial.println("AWS IoT Connected!");
 }
@@ -264,6 +267,35 @@ double get_current()
   /*The circuit is amplified by 2 times, so it is divided by 2.*/
   voltageVirtualValue = (voltageVirtualValue / 1024 * VREF) / 2;
   return voltageVirtualValue * ACRANGE;
+}
+
+void validate_nfc_write() {
+  // TODO - Validate NFC write information
+  return;
+}
+
+void build_topic(Sparkplug newConfig) {
+  // Build topic starting with namespace
+  strcpy(topic, newConfig.nspace);
+  strcat(topic,"/");
+  strcat(topic, newConfig.group_id);
+  strcat(topic,"/");
+  strcat(topic, newConfig.message_type);
+  strcat(topic,"/");
+  strcat(topic, newConfig.edge_node_id);
+  strcat(topic,"/");
+  strcat(topic, newConfig.device_id);
+}
+
+// TODO - Parse NFC write information
+void config_nfc() {
+  Sparkplug reconfig;
+  // Write new values to memory
+  EEPROM.put(0, config);
+  EEPROM.commit();
+  // Read new values from memory
+  EEPROM.get(0, config);
+  build_topic(config);
 }
 
 // Auxiiliary Task
@@ -285,14 +317,13 @@ void MQTTProcess(void *pvParameters)
   double readingSamples;
   
   // Initialize global JSON doc
-  doc["fs"] = samplingFrequency;
-  doc["a_lim"] = 20;
-  doc["cycle_time"] = 4;
-  doc["cost_hr"] = 1000;
-  doc["mfgr"] = "custom";
-  doc["model"] = "custom";
-  doc["yr"] = 2022;
-  doc["process"] = "manufacturing";
+  doc["metrics"]["fs"] = samplingFrequency;
+  doc["metrics"]["a_lim"] = 20;
+  doc["metrics"]["sample_time"] = 4;
+  doc["device"]["mfgr"] = "custom";
+  doc["device"]["model"] = "custom";
+  doc["device"]["yr"] = 2022;
+  doc["device"]["process"] = "manufacturing";
 
   size_t n;
 
@@ -323,26 +354,28 @@ void MQTTProcess(void *pvParameters)
       run_fft(readings);
 
       // Write values to global JSON doc
-      doc["peak_hz"] = peak_hz;
-      doc["energy"] = energy * 0.170;
-      doc["a_max"] = a_max;
-      doc["a_rms"] = a_rms;
-      doc["freq_max"] = freq_max;
-      doc["freq_rms"] = freq_rms;
+      doc["metrics"]["peak_hz"] = peak_hz;
+      doc["metrics"]["energy"] = energy * 0.170;
+      doc["metrics"]["a_max"] = a_max;
+      doc["metrics"]["a_rms"] = a_rms;
+      doc["metrics"]["freq_max"] = freq_max;
+      doc["metrics"]["freq_rms"] = freq_rms;
 
       // Prepare JSON message
       n = serializeJson(doc, buffer);
       
       // client.publish(AWS_IOT_PUBLISH_TOPIC, buffer);
-      if (!client.publish(AWS_IOT_PUBLISH_TOPIC, buffer, n))
+      if (!client.publish(topic, buffer, n))
       {
         // Only report errors
         Serial.println(buffer);
         Serial.print("Unable to send to ");
-        Serial.println(AWS_IOT_PUBLISH_TOPIC);
+        Serial.println(topic);
       }
 
       client.loop();
+      Serial.print("Namespace: ");
+      Serial.println(config.nspace);
       // DELETING THIS DELAY WILL CRASH THE MCU
       delay(20);
     }
@@ -361,50 +394,57 @@ void CurrentProcess(void *pvParameters)
   }
 }
 
+void verify_config(Sparkplug config) {
+  Sparkplug readConfig;
+  EEPROM.get(0, readConfig);
+  if (config.nspace != readConfig.nspace) {
+    Serial.print("Updating namespace from ");
+    Serial.print(readConfig.nspace);
+    Serial.print(" to ");
+    Serial.println(config.nspace);
+    EEPROM.put(0, config);
+    EEPROM.commit();
+  }
+  else {
+    Serial.println("Namespace is valid");
+  }
+}
+
 // Setup sequence
 void setup()
 {
-  // Start serial server and connect to WiFi
-  delay(200);
+  // Start serial server
   Serial.begin(115200);
   while (!Serial)
     ;
+  delay(2000);
 
-  // Initialize SPIFFS
-  if (!SPIFFS.begin(true))
-  {
-    Serial.println("An error has occurred while mounting SPIFFS");
-    ESP.restart();
-  }
-
-  xTaskCreatePinnedToCore(
-      MQTTProcess,  /* Task function. */
-      "MQTT",       /* name of task. */
-      10000,        /* Stack size of task */
-      NULL,         /* parameter of the task */
-      1,            /* priority of the task */
-      &MQTTHandler, /* Task handle to keep track of created task */
-      0);           /* pin task to core 0 */
+  EEPROM.begin(EEPROM_SIZE); // Initialize EEPROM
+  EEPROM.get(0, config);
+  
+  build_topic(config);
+  // Finish interrupt setup
+  attachInterrupt(digitalPinToInterrupt(32), config_nfc, RISING);
 
   xTaskCreatePinnedToCore(
-      CurrentProcess,  /* Task function. */
-      "Current",       /* name of task. */
-      10000,           /* Stack size of task */
-      NULL,            /* parameter of the task */
-      2,               /* priority of the task */
-      &CurrentHandler, /* Task handle to keep track of created task */
-      1);              /* pin task to core 1 */
+    MQTTProcess,  /* Task function. */
+    "MQTT",       /* name of task. */
+    10000,        /* Stack size of task */
+    NULL,         /* parameter of the task */
+    1,            /* priority of the task */
+    &MQTTHandler, /* Task handle to keep track of created task */
+    0
+  );           /* pin task to core 0 */
 
-  // Assemble topic
-  strcpy(topic, nspace);
-  strcat(topic,"/");
-  strcat(topic,group_id);
-  strcat(topic,"/");
-  strcat(topic,message_type);
-  strcat(topic,"/");
-  strcat(topic,edge_node_id);
-  strcat(topic,"/");
-  strcat(topic,device_id);
+  xTaskCreatePinnedToCore(
+    CurrentProcess,  /* Task function. */
+    "Current",       /* name of task. */
+    10000,           /* Stack size of task */
+    NULL,            /* parameter of the task */
+    2,               /* priority of the task */
+    &CurrentHandler, /* Task handle to keep track of created task */
+    1
+  );              /* pin task to core 1 */
 }
 
 // Main loop
