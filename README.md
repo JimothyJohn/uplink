@@ -18,7 +18,7 @@ bash utils/Quickstart.sh
 
 - [PlatformIO](https://docs.platformio.org/en/latest/core/installation/methods/installer-script.html#super-quick-macos-linux) to build and upload the project
 - [Terraform](https://developer.hashicorp.com/terraform/downloads) to configure your IoT cloud infrastructure
-- [AWS account](https://console.aws.amazon.com/iot) account
+- [AWS account](https://console.aws.amazon.com/iot)
 
 ## Hardware
 
@@ -26,9 +26,17 @@ bash utils/Quickstart.sh
 - [Current Sensor](https://wiki.dfrobot.com/Gravity_Analog_AC_Current_Sensor__SKU_SEN0211_)
 - [NFC Reader](http://hiletgo.com/ProductDetail/2156958.html)
 
-### To-do
+### TODO
 
-[x] Connect to external MQTT Broker (AWS IoT) 
+[ ] IN PROGRESS - NFC-powered mobile configuration
+
+[x] Connect to secure MQTT Broker (AWS IoT) 
+
+[ ] Make broker/topic agnostic
+
+[ ] Add Azure IoT functionality via Terraform
+
+[ ] Learn historical states of device
 
 [x] Analyze waveforms on device
 
@@ -36,12 +44,10 @@ bash utils/Quickstart.sh
 
 [x] Conform topics to [Sparkplug B](https://s3.amazonaws.com/cirrus-link-com/Sparkplug+Specification+Version+1.0.pdf) spec
 
-[ ] NFC-powered mobile configuration
+[x] Save parameters to memory
 
 [ ] Improve Quickstart platform compatibility (for developers) 
 
 [ ] Create user manual
-
-[ ] Add Azure IoT functionality via Terraform
 
 [ ] Move metadata characteristics to cloud

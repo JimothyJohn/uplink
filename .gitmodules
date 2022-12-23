@@ -1,0 +1,3 @@
+[submodule "lib/ST25DV"]
+	path = lib/ST25DV
+	url = https://github.com/JimothyJohn/ST25DV.git

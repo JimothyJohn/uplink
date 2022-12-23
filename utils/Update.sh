@@ -19,10 +19,14 @@ LOG_DIR=".logs"
 PARAMS=""
 
 main() {
-
-    mkdir -p .logs
+    # Create new folders if needed
+    mkdir -p {.logs,lib/ST25DV}
+    # Remove old uptime library
+    rm -f -r .pio/libdeps/esp-wrover-kit/uptime
+    # Copy forked ST25DV library
+    cp -r ../ST25DV/* lib/ST25DV
+    # Upload new firmware and log output
     $PIO run -t upload | tee $LOG_DIR/upload.txt
-    # cp ./.pio/build/esp-wrover-kit/*.bin ./firmware
     
     if [[ $TESTING == "true" ]]
     then
@@ -32,6 +36,7 @@ main() {
 
     if [[ $MONITOR == "true" ]]
     then
+    # Monitor serial output and log output
     $PIO device monitor | tee $LOG_DIR/monitor.txt
     fi
 }
