@@ -1,0 +1,6 @@
+[submodule "NDEF"]
+	path = NDEF
+	url = https://github.com/don/NDEF.git
+[submodule "PN532"]
+	path = PN532
+	url = https://github.com/Seeed-Studio/PN532.git

@@ -6,7 +6,7 @@
 // For Arduino Zero, Due, MKR Family, ESP32, etc. 3V3 controllers, change VREF to 3.3
 static const double VREF = 3.3;
 static const double ACRANGE = 20;
-// Allow for larger memory allocation 
+// Allow for larger memory allocation
 static const size_t EEPROM_SIZE = 512;
 static const size_t JSON_SIZE = 512;
 
@@ -40,25 +40,28 @@ struct Sparkplug
   char message_type[32];
   // edge_node_id = location
   char edge_node_id[32];
-  // device_id = machine name 
+  // device_id = machine name
   char device_id[32];
 };
 
-struct Device {
+struct Device
+{
   char manufacturer[32];
   char model[32];
   uint16_t year;
   char operation[32];
 };
 
-struct Broker {
+struct Broker
+{
   char host[32];
   uint16_t port;
   char user[32];
   char pass[32];
 };
 
-struct Settings {
+struct Settings
+{
   uint8_t fs;
   // This value must always be a power of 2
   uint16_t samples;
@@ -66,7 +69,8 @@ struct Settings {
   uint8_t a_lim;
 };
 
-struct Measurement {
+struct Measurement
+{
   float energy;
   double a_max;
   double a_rms;

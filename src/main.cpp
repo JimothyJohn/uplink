@@ -1,9 +1,9 @@
 // Load relevant libraries
 #include <WiFiClientSecure.h>
-#include <MQTTClient.h>      // Enable MQTT
-#include <ArduinoJson.h>     // Handle JSON messages
-#include "uptime.h"          // Project library  
-#include "secrets.h"        // AWS IoT credentials
+#include <MQTTClient.h>  // Enable MQTT
+#include <ArduinoJson.h> // Handle JSON messages
+#include "uptime.h"      // Project library
+#include "secrets.h"     // AWS IoT credentials
 
 // Dual-core tasks
 TaskHandle_t MQTTHandler;
@@ -12,13 +12,12 @@ TaskHandle_t CurrentHandler;
 // Network clients
 WiFiClientSecure net = WiFiClientSecure();
 MQTTClient client = MQTTClient(JSON_SIZE);
-	
+
 const Settings settings = {
-  16,
-  128,
-  4,
-  20
-};
+    16,
+    128,
+    4,
+    20};
 
 // Measurement parameters
 const uint8_t samplingDelay = static_cast<uint8_t>(1000 / settings.fs / settings.smoothingFactor);
@@ -26,27 +25,28 @@ const uint8_t samplingDelay = static_cast<uint8_t>(1000 / settings.fs / settings
 const char *topic;
 
 const Sparkplug oldconfig = {
-  "Armenta",
-  "Home",
-  "signal",
-  "Bedford",
-  "uptime"
-};
+    "Armenta",
+    "Home",
+    "signal",
+    "Bedford",
+    "uptime"};
 
 Device device{
-  "okuma",
-  "lb-ex",
-  2019,
-  "lathe"
-};
+    "okuma",
+    "lb-ex",
+    2019,
+    "lathe"};
 
-void messageHandler(String &topic, String &payload) {
+void messageHandler(String &topic, String &payload)
+{
   Serial.println("incoming: " + topic + " - " + payload);
 }
 
-void connect_wifi() {
+void connect_wifi()
+{
   Serial.print("Connecting to Wi-Fi");
-  while (WiFi.status() != WL_CONNECTED){
+  while (WiFi.status() != WL_CONNECTED)
+  {
     delay(500);
     Serial.print(".");
   }
@@ -69,13 +69,14 @@ void connectAWS()
 
   Serial.print("\rConnecting to AWS IOT");
 
-  while (!client.connect(THINGNAME)) {
+  while (!client.connect(THINGNAME))
+  {
     Serial.print(".");
     delay(100);
   }
-  
-  if(!client.connected()){
-    
+
+  if (!client.connected())
+  {
     Serial.println("\rAWS IoT Timeout!        ");
     return;
   }
@@ -89,23 +90,23 @@ void MQTTProcess(void *pvParameters)
   /*
   Core 0 process
   Acquires signal sample and publishes
-  measurements as JSON over MQTT 
+  measurements as JSON over MQTT
   */
-  
-  StaticJsonDocument<JSON_SIZE> doc;
+
+  StaticJsonDocument<JSON_SIZE> mqttPayload;
   Measurement metrics;
   char buffer[JSON_SIZE];
   double readings[samples];
   double readingSamples;
-  
-  // Initialize global JSON doc
-  doc["settings"]["fs"] = settings.fs;
-  doc["settings"]["samples"] = settings.samples;
-  doc["settings"]["a_lim"] = settings.a_lim;
-  doc["device"]["manufacturer"] = device.manufacturer;
-  doc["device"]["model"] = device.model;
-  doc["device"]["year"] = device.year;
-  doc["device"]["process"] = device.operation;
+
+  // Initialize global JSONmqttPayload
+  mqttPayload["settings"]["fs"] = settings.fs;
+  mqttPayload["settings"]["samples"] = settings.samples;
+  mqttPayload["settings"]["a_lim"] = settings.a_lim;
+  mqttPayload["device"]["manufacturer"] = device.manufacturer;
+  mqttPayload["device"]["model"] = device.model;
+  mqttPayload["device"]["year"] = device.year;
+  mqttPayload["device"]["process"] = device.operation;
 
   size_t n;
 
@@ -135,23 +136,23 @@ void MQTTProcess(void *pvParameters)
       // Analyze signal
       metrics = run_fft(readings, settings);
 
-      // Write values to global JSON doc
-      doc["metrics"]["peak_hz"] = metrics.peak_hz;
-      doc["metrics"]["energy"] = metrics.energy;
-      doc["metrics"]["a_max"] = metrics.a_max;
-      doc["metrics"]["a_rms"] = metrics.a_rms;
-      doc["metrics"]["freq_max"] = metrics.freq_max;
-      doc["metrics"]["freq_rms"] = metrics.freq_rms;
+      mqttPayload["metrics"]["peak_hz"] = metrics.peak_hz;
+      mqttPayload["metrics"]["energy"] = metrics.energy;
+      mqttPayload["metrics"]["a_max"] = metrics.a_max;
+      mqttPayload["metrics"]["a_rms"] = metrics.a_rms;
+      mqttPayload["metrics"]["freq_max"] = metrics.freq_max;
+      mqttPayload["metrics"]["freq_rms"] = metrics.freq_rms;
 
       // Prepare JSON message
-      n = serializeJson(doc, buffer);
-      
+      n = serializeJson(mqttPayload, buffer);
+
       if (client.publish(topic, buffer, n))
       {
         Serial.print("\rSent payload to topic \"");
         Serial.print(topic);
         Serial.print("\"");
-      } else
+      }
+      else
       {
         Serial.println(buffer);
         Serial.print("Unable to send to ");
@@ -168,9 +169,6 @@ void MQTTProcess(void *pvParameters)
 // TODO Convert to NFC / error handling process
 void CurrentProcess(void *pvParameters)
 {
-  // Serial.print("No task running on core ");
-  // Serial.println(xPortGetCoreID());
-
   for (;;)
   {
     delay(1000);
@@ -190,25 +188,25 @@ void setup()
 
   topic = read_nfc();
 
-  xTaskCreatePinnedToCore(
-    MQTTProcess,  /* Task function. */
-    "MQTT",       /* name of task. */
-    10000,        /* Stack size of task */
-    NULL,         /* parameter of the task */
-    1,            /* priority of the task */
-    &MQTTHandler, /* Task handle to keep track of created task */
-    0
-  );           /* pin task to core 0 */
+  // save_topic(topic);
 
   xTaskCreatePinnedToCore(
-    CurrentProcess,  /* Task function. */
-    "Current",       /* name of task. */
-    10000,           /* Stack size of task */
-    NULL,            /* parameter of the task */
-    2,               /* priority of the task */
-    &CurrentHandler, /* Task handle to keep track of created task */
-    1
-  );              /* pin task to core 1 */
+      MQTTProcess,  /* Task function. */
+      "MQTT",       /* name of task. */
+      10000,        /* Stack size of task */
+      NULL,         /* parameter of the task */
+      1,            /* priority of the task */
+      &MQTTHandler, /* Task handle to keep track of created task */
+      0);           /* pin task to core 0 */
+
+  xTaskCreatePinnedToCore(
+      CurrentProcess,  /* Task function. */
+      "Current",       /* name of task. */
+      10000,           /* Stack size of task */
+      NULL,            /* parameter of the task */
+      2,               /* priority of the task */
+      &CurrentHandler, /* Task handle to keep track of created task */
+      1);              /* pin task to core 1 */
 }
 
 // Main loop
