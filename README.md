@@ -26,24 +26,28 @@ bash utils/Quickstart.sh
 - [Current Sensor](https://wiki.dfrobot.com/Gravity_Analog_AC_Current_Sensor__SKU_SEN0211_)
 - [NFC Tag](https://www.adafruit.com/product/4701)
 
-### TODO
+### Features 
 
-[ ] IN PROGRESS - Move metadata characteristics and MQTT data to cloud
+[ ] [MQTT](https://mqtt.org) broker agnostic 
 
-[ ] Add Azure IoT functionality via Terraform
+[x] Mobile setup over [NFC](https://nfc-forum.org) 
 
-[ ] Learn historical states at edge 
+[x] Secure MQTT broker on [AWS IoT](https://aws.amazon.com/iot-core/?nc=sn&loc=2&dn=3)
 
-[ ] Improve Quickstart platform compatibility (for developers) 
+[x] Edge-side spectrum analysis with [arduinoFFT](https://github.com/kosme/arduinoFFT)
+
+[x] Deployed via [Terraform](https://developer.hashicorp.com/terraform/downloads)
+
+[x] Conforms to [Sparkplug B](https://s3.amazonaws.com/cirrus-link-com/Sparkplug+Specification+Version+1.0.pdf) spec
+
+### Fix list
+
+[ ] Retrieve device data from cloud
 
 [ ] Detect NFC activity
 
-[x] Mobile setup over NFC 
+[ ] Create tests 
 
-[x] Connect to secure MQTT Broker (AWS IoT) 
+[ ] Edge-side state determination
 
-[x] Analyze waveforms on device
-
-[x] Commission AWS Thing with Terraform 
-
-[x] Conform topics to [Sparkplug B](https://s3.amazonaws.com/cirrus-link-com/Sparkplug+Specification+Version+1.0.pdf) spec
+[ ] Improve Quickstart platform compatibility 

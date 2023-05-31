@@ -72,7 +72,7 @@ double get_current()
   return voltageVirtualValue * ACRANGE;
 }
 
-const char *read_nfc()
+void read_nfc(char *topic)
 {
 
   // The wire instance used can be omited in case you use default Wire instance
@@ -113,13 +113,36 @@ const char *read_nfc()
   byte payload[payloadLength];
   record.getPayload(payload);
   char char_array[payloadLength];
+  const char *prefixArray = "uptime/";
   memccpy(char_array, payload, 0, payloadLength);
-  char json_payload[payloadLength];
+
+  // Hard code DB ID length
+  // char *id[ID_LENGTH];
   // TODO - Properly read buffer
-  for (uint8_t i = 3; i < payloadLength; i++)
+  for (uint8_t i = 0; i < 7; i++)
   {
-    json_payload[i - 3] = char_array[i];
+    topic[i] = prefixArray[i];
   }
+  for (uint8_t i = 0; i < TOPIC_LENGTH - 4; i++)
+  {
+    topic[i + 7] = char_array[i + 3];
+  }
+  topic[TOPIC_LENGTH] = '\0';
+
+  Serial.print("NFC payload: ");
+  Serial.println(char_array);
+
+  Serial.print("ID: ");
+  Serial.println(topic);
+
+  Serial.print("Length: ");
+  Serial.println(payloadLength);
+
+  return;
+
+  /*
+  // Old JSON method (not enough space on tag)
+
 
   DeserializationError error = deserializeJson(nfcPayload, json_payload);
   if (error.c_str() != "Ok")
@@ -134,7 +157,9 @@ const char *read_nfc()
   {
     Serial.println("No topic found in JSON object");
   }
+
   return nfcPayload["topic"];
+  */
 }
 
 void save_topic(const char *topic)

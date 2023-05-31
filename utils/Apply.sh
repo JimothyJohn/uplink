@@ -21,10 +21,11 @@ main() {
     CERTIFICATE=$(cat terraform.tfstate \
         | jq .resources[2].instances[0].attributes.certificate_pem)
 
-    sed -i -r "s|// Device.*||g" include/secrets.h
-    sed -i -r "s/static const char AWS_CERT_CRT.*//g" include/secrets.h
-    sed -i -r "s/static const char AWS_CERT_PRIVATE.*//g" include/secrets.h
-    sed -i "s/\n\n$//" include/secrets.h
+    # https://singhkays.com/blog/sed-error-i-expects-followed-by-text/
+    sed -i'' -e -r "s|// Device.*||g" include/secrets.h
+    sed -i'' -e -r "s/static const char AWS_CERT_CRT.*//g" include/secrets.h
+    sed -i'' -e -r "s/static const char AWS_CERT_PRIVATE.*//g" include/secrets.h
+    sed -i'' -e "s/\n\n$//" include/secrets.h
     echo "// Device certificate" >> include/secrets.h
     echo "static const char AWS_CERT_CRT[] PROGMEM = $CERTIFICATE;" >> include/secrets.h
     echo "// Device Private Key" >> include/secrets.h

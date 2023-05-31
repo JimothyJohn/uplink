@@ -1,7 +1,9 @@
 // Source: https://aws.amazon.com/blogs/compute/building-an-aws-iot-core-device-using-aws-serverless-and-an-esp32/
 #include <Arduino.h>
+#include <ArduinoJson.h> // Handle JSON messages
 
 #define NDEF_MAX_SIZE 256
+#define THING_NAME "uptime"
 
 // For Arduino Zero, Due, MKR Family, ESP32, etc. 3V3 controllers, change VREF to 3.3
 static const double VREF = 3.3;
@@ -31,6 +33,9 @@ static const uint8_t ACPIN = 32;
 // Number of signal samples
 static const uint16_t samples = 128;
 
+// DB key ID length
+static const uint8_t TOPIC_LENGTH = 44;
+
 struct Sparkplug
 {
   // namespace = company name
@@ -46,10 +51,10 @@ struct Sparkplug
 
 struct Device
 {
-  char manufacturer[32];
-  char model[32];
+  String manufacturer;
+  String model;
   uint16_t year;
-  char operation[32];
+  String operation;
 };
 
 struct Broker
@@ -79,10 +84,17 @@ struct Measurement
   double peak_hz;
 };
 
+enum Config
+{
+  DEVICE = 0,
+  SETTINGS = 1,
+  TOPIC = 2
+};
+
 Measurement run_fft(double vReal[], Settings settings);
 
 double get_current();
 
-const char *read_nfc();
+void read_nfc(char *topic);
 
-void save_topic(const char *topic);
+void save_topic(char *topic);

@@ -2,6 +2,7 @@
 #include <WiFiClientSecure.h>
 #include <MQTTClient.h>  // Enable MQTT
 #include <ArduinoJson.h> // Handle JSON messages
+#include <EEPROM.h>      // Handle JSON messages
 #include "uptime.h"      // Project library
 #include "secrets.h"     // AWS IoT credentials
 
@@ -13,6 +14,8 @@ TaskHandle_t CurrentHandler;
 WiFiClientSecure net = WiFiClientSecure();
 MQTTClient client = MQTTClient(JSON_SIZE);
 
+StaticJsonDocument<JSON_SIZE> payloadDoc;
+
 const Settings settings = {
     16,
     128,
@@ -22,39 +25,127 @@ const Settings settings = {
 // Measurement parameters
 const uint8_t samplingDelay = static_cast<uint8_t>(1000 / settings.fs / settings.smoothingFactor);
 
+// char *topic[];
+char tagData[TOPIC_LENGTH];
 const char *topic;
 
-const Sparkplug oldconfig = {
-    "Armenta",
-    "Home",
-    "signal",
-    "Bedford",
-    "uptime"};
+void update_device(Device device)
+{
+  payloadDoc["device"]["manufacturer"] = device.manufacturer;
+  payloadDoc["device"]["model"] = device.model;
+  payloadDoc["device"]["year"] = device.year;
+  payloadDoc["device"]["process"] = device.operation;
+  EEPROM.begin(EEPROM_SIZE);
+  EEPROM.put(Config::DEVICE, device);
+  EEPROM.commit();
+  EEPROM.end();
+}
 
-Device device{
-    "okuma",
-    "lb-ex",
-    2019,
-    "lathe"};
+void update_metrics(Measurement metrics)
+{
+  payloadDoc["metrics"]["energy"] = metrics.energy;
+  payloadDoc["metrics"]["a_max"] = metrics.a_max;
+  payloadDoc["metrics"]["a_rms"] = metrics.a_rms;
+  payloadDoc["metrics"]["freq_max"] = metrics.freq_max;
+  payloadDoc["metrics"]["freq_rms"] = metrics.freq_rms;
+  payloadDoc["metrics"]["peak_hz"] = metrics.peak_hz;
+}
+
+void update_settings(Settings settings)
+{
+  payloadDoc["settings"]["fs"] = settings.fs;
+  payloadDoc["settings"]["samples"] = settings.samples;
+  payloadDoc["settings"]["a_lim"] = settings.a_lim;
+  EEPROM.begin(EEPROM_SIZE);
+  EEPROM.put(Config::SETTINGS, settings);
+  EEPROM.commit();
+  EEPROM.end();
+}
+
+void update_topic(const char *topic)
+{
+  char topicsections[][32] = {"", "", "", "", ""};
+  uint8_t n = strlen(topic);
+  uint8_t parsedChars = 0;
+  uint8_t index = 0;
+
+  for (uint8_t i = 0; i < n; i++)
+  {
+    // Only grab non forward slash characters
+    if (topic[i] != '/')
+    {
+      // Add character to array index then index
+      topicsections[index][parsedChars] = topic[i];
+      parsedChars++;
+    }
+    else
+    {
+      // Increase index and reset parsing counter
+      index++;
+      parsedChars = 0;
+    }
+  }
+
+  Sparkplug newTopic = {
+      *topicsections[0],
+      *topicsections[1],
+      *topicsections[2],
+      *topicsections[3],
+      *topicsections[4],
+  };
+
+  payloadDoc["config"]["namespace"] = topicsections[0];
+  payloadDoc["config"]["group_id"] = topicsections[1];
+  payloadDoc["config"]["message_type"] = topicsections[2];
+  payloadDoc["config"]["edge_node_id"] = topicsections[3];
+  payloadDoc["config"]["device_id"] = topicsections[4];
+
+  EEPROM.begin(EEPROM_SIZE);
+  EEPROM.put(Config::TOPIC, newTopic);
+  EEPROM.commit();
+  EEPROM.end();
+}
 
 void messageHandler(String &topic, String &payload)
 {
-  Serial.println("incoming: " + topic + " - " + payload);
+  StaticJsonDocument<JSON_SIZE> devicePayload;
+  size_t n = sizeof(payload);
+  char json_payload[n];
+
+  DeserializationError error = deserializeJson(devicePayload, payload);
+  if (error.c_str() != "Ok")
+  {
+    Serial.print("JSON Deserialization error: ");
+    Serial.println(error.c_str());
+    Serial.println("JSON payload: ");
+    Serial.println(json_payload);
+  }
+
+  EEPROM.begin(EEPROM_SIZE);
+
+  if (topic == "Armenta/Home/cmd/Bedford/uptime")
+  {
+    Device device = {
+        devicePayload["manufacturer"].as<String>(),
+        devicePayload["model"].as<String>(),
+        devicePayload["year"].as<uint16_t>(),
+        devicePayload["operation"].as<String>()};
+
+    EEPROM.put(0, device);
+    update_device(device);
+  }
+
+  EEPROM.commit();
+  EEPROM.end();
 }
 
-void connect_wifi()
+uint8_t connectAWS()
 {
-  Serial.print("Connecting to Wi-Fi");
   while (WiFi.status() != WL_CONNECTED)
   {
-    delay(500);
-    Serial.print(".");
+    Serial.print("\rConnecting to Wi-Fi...");
+    delay(1000);
   }
-}
-
-void connectAWS()
-{
-  connect_wifi();
 
   // Configure WiFiClientSecure to use the AWS IoT device credentials
   net.setCACert(AWS_CERT_CA);
@@ -67,21 +158,25 @@ void connectAWS()
   // Create a message handler
   client.onMessage(messageHandler);
 
-  Serial.print("\rConnecting to AWS IOT");
-
-  while (!client.connect(THINGNAME))
+  while (!client.connect(THING_NAME))
   {
-    Serial.print(".");
-    delay(100);
+    Serial.print("\rConnecting to AWS IOT with client ID \"");
+    Serial.print(THING_NAME);
+    Serial.print("\"...");
+    delay(1000);
   }
 
   if (!client.connected())
   {
     Serial.println("\rAWS IoT Timeout!        ");
-    return;
+    return 1;
   }
 
-  Serial.println("\rAWS IoT connected!          ");
+  client.subscribe("uptime/*");
+  Serial.print("\rConnected to AWS IoT with client ID ");
+  Serial.print(THING_NAME);
+  Serial.print("!");
+  return 0;
 }
 
 // Auxiiliary Task
@@ -93,20 +188,19 @@ void MQTTProcess(void *pvParameters)
   measurements as JSON over MQTT
   */
 
-  StaticJsonDocument<JSON_SIZE> mqttPayload;
   Measurement metrics;
+  Device device;
+  EEPROM.begin(EEPROM_SIZE);
+  EEPROM.get(0, device);
+  EEPROM.end();
   char buffer[JSON_SIZE];
   double readings[samples];
   double readingSamples;
+  uint32_t payloadCount = 0;
 
-  // Initialize global JSONmqttPayload
-  mqttPayload["settings"]["fs"] = settings.fs;
-  mqttPayload["settings"]["samples"] = settings.samples;
-  mqttPayload["settings"]["a_lim"] = settings.a_lim;
-  mqttPayload["device"]["manufacturer"] = device.manufacturer;
-  mqttPayload["device"]["model"] = device.model;
-  mqttPayload["device"]["year"] = device.year;
-  mqttPayload["device"]["process"] = device.operation;
+  // Initialize global JSONpayloadDoc
+  update_settings(settings);
+  update_device(device);
 
   size_t n;
 
@@ -134,34 +228,44 @@ void MQTTProcess(void *pvParameters)
       }
 
       // Analyze signal
-      metrics = run_fft(readings, settings);
+      // metrics = run_fft(readings, settings);
+      // Test metrics
+      // Creates a random float between 0 and 3
+      double samples[] = {0.0, 1.0, 5.0};
+      uint8_t randInt = random(0, 3);
+      metrics = Measurement{
+          0.0,
+          0.0,
+          samples[randInt],
+          0.0,
+          0.0,
+          0.0};
 
-      mqttPayload["metrics"]["peak_hz"] = metrics.peak_hz;
-      mqttPayload["metrics"]["energy"] = metrics.energy;
-      mqttPayload["metrics"]["a_max"] = metrics.a_max;
-      mqttPayload["metrics"]["a_rms"] = metrics.a_rms;
-      mqttPayload["metrics"]["freq_max"] = metrics.freq_max;
-      mqttPayload["metrics"]["freq_rms"] = metrics.freq_rms;
+      update_metrics(metrics);
 
       // Prepare JSON message
-      n = serializeJson(mqttPayload, buffer);
+      n = serializeJson(payloadDoc, buffer);
 
       if (client.publish(topic, buffer, n))
       {
+        payloadCount++;
         Serial.print("\rSent payload to topic \"");
         Serial.print(topic);
-        Serial.print("\"");
+        Serial.print("\" ");
+        Serial.print(payloadCount);
+        Serial.print(" times...");
       }
       else
       {
-        Serial.println(buffer);
-        Serial.print("Unable to send to ");
-        Serial.println(topic);
+        Serial.print("\rUnable to send to ");
+        Serial.print(buffer);
+        Serial.print(" to ");
+        Serial.print(topic);
+        Serial.println("\"!");
       }
-
       client.loop();
       // DELETING THIS DELAY WILL CRASH THE MCU
-      delay(20);
+      delay(10);
     }
   }
 }
@@ -186,18 +290,21 @@ void setup()
   WiFi.mode(WIFI_STA);
   WiFi.begin(WIFI_SSID, WIFI_PASSWORD);
 
-  topic = read_nfc();
+  // TODO - Move into main() loop when tag is updated
+  read_nfc(tagData);
+  topic = tagData;
+  Serial.print("Topic: ");
+  Serial.println(topic);
+  // update_topic(topic);
 
-  // save_topic(topic);
-
-  xTaskCreatePinnedToCore(
-      MQTTProcess,  /* Task function. */
-      "MQTT",       /* name of task. */
-      10000,        /* Stack size of task */
-      NULL,         /* parameter of the task */
-      1,            /* priority of the task */
-      &MQTTHandler, /* Task handle to keep track of created task */
-      0);           /* pin task to core 0 */
+  // Figure out a use for the second core
+  xTaskCreatePinnedToCore(MQTTProcess,  /* Task function. */
+                          "MQTT",       /* name of task. */
+                          10000,        /* Stack size of task */
+                          NULL,         /* parameter of the task */
+                          1,            /* priority of the task */
+                          &MQTTHandler, /* Task handle to keep track of created task */
+                          0);           /* pin task to core 0 */
 
   xTaskCreatePinnedToCore(
       CurrentProcess,  /* Task function. */
