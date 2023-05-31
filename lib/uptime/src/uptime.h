@@ -9,66 +9,38 @@
 static const double VREF = 3.3;
 static const double ACRANGE = 20;
 // Allow for larger memory allocation
-static const size_t EEPROM_SIZE = 512;
-static const size_t JSON_SIZE = 512;
+static const uint16_t EEPROM_SIZE = 512;
+static const uint16_t JSON_SIZE = 512;
 
 static uint16_t MQTT_PORT = 8883;
-static const char MQTT_USER[] = "";
-static const char MQTT_PASS[] = "";
 
 // Simulated signal index types
-static const byte SCL_INDEX = 0x00;
-static const byte SCL_TIME = 0x01;
-static const byte SCL_FREQUENCY = 0x02;
-static const byte SCL_PLOT = 0x03;
+static const uint8_t SCL_INDEX = 0x00;
+static const uint8_t SCL_TIME = 0x01;
+static const uint8_t SCL_FREQUENCY = 0x02;
+static const uint8_t SCL_PLOT = 0x03;
 
 // NFC Tag pins
 // GPO is interruption pin configurable on RF events
 // field change, memory write, activity, Fast Transfer end, user set/reset/pulse)
+// TODO Use this instead of reading the NFC tag every time?
 static const uint8_t GPO_PIN = 0;
 // LPD is interrupt pin for NFC field detection
 static const uint8_t LPD_PIN = 33;
 // Set pin for current sensor (must be ADC DIO, not CH2)
 static const uint8_t ACPIN = 32;
 // Number of signal samples
-static const uint16_t samples = 128;
+static const uint8_t samples = 128;
 
 // DB key ID length
 static const uint8_t TOPIC_LENGTH = 44;
-
-struct Sparkplug
-{
-  // namespace = company name
-  char nspace[32];
-  // group_id = business unit
-  char group_id[32];
-  char message_type[32];
-  // edge_node_id = location
-  char edge_node_id[32];
-  // device_id = machine name
-  char device_id[32];
-};
-
-struct Device
-{
-  String manufacturer;
-  String model;
-  uint16_t year;
-  String operation;
-};
-
-struct Broker
-{
-  char host[32];
-  uint16_t port;
-  char user[32];
-  char pass[32];
-};
+static const char *TOPIC_PREFIX = "uptime/";
 
 struct Settings
 {
   uint8_t fs;
   // This value must always be a power of 2
+  // Experiment with different lengths of time and accuracy
   uint16_t samples;
   uint8_t smoothingFactor;
   uint8_t a_lim;

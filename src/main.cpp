@@ -25,22 +25,6 @@ const Settings settings = {
 // Measurement parameters
 const uint8_t samplingDelay = static_cast<uint8_t>(1000 / settings.fs / settings.smoothingFactor);
 
-// char *topic[];
-char tagData[TOPIC_LENGTH];
-const char *topic;
-
-void update_device(Device device)
-{
-  payloadDoc["device"]["manufacturer"] = device.manufacturer;
-  payloadDoc["device"]["model"] = device.model;
-  payloadDoc["device"]["year"] = device.year;
-  payloadDoc["device"]["process"] = device.operation;
-  EEPROM.begin(EEPROM_SIZE);
-  EEPROM.put(Config::DEVICE, device);
-  EEPROM.commit();
-  EEPROM.end();
-}
-
 void update_metrics(Measurement metrics)
 {
   payloadDoc["metrics"]["energy"] = metrics.energy;
@@ -62,50 +46,6 @@ void update_settings(Settings settings)
   EEPROM.end();
 }
 
-void update_topic(const char *topic)
-{
-  char topicsections[][32] = {"", "", "", "", ""};
-  uint8_t n = strlen(topic);
-  uint8_t parsedChars = 0;
-  uint8_t index = 0;
-
-  for (uint8_t i = 0; i < n; i++)
-  {
-    // Only grab non forward slash characters
-    if (topic[i] != '/')
-    {
-      // Add character to array index then index
-      topicsections[index][parsedChars] = topic[i];
-      parsedChars++;
-    }
-    else
-    {
-      // Increase index and reset parsing counter
-      index++;
-      parsedChars = 0;
-    }
-  }
-
-  Sparkplug newTopic = {
-      *topicsections[0],
-      *topicsections[1],
-      *topicsections[2],
-      *topicsections[3],
-      *topicsections[4],
-  };
-
-  payloadDoc["config"]["namespace"] = topicsections[0];
-  payloadDoc["config"]["group_id"] = topicsections[1];
-  payloadDoc["config"]["message_type"] = topicsections[2];
-  payloadDoc["config"]["edge_node_id"] = topicsections[3];
-  payloadDoc["config"]["device_id"] = topicsections[4];
-
-  EEPROM.begin(EEPROM_SIZE);
-  EEPROM.put(Config::TOPIC, newTopic);
-  EEPROM.commit();
-  EEPROM.end();
-}
-
 void messageHandler(String &topic, String &payload)
 {
   StaticJsonDocument<JSON_SIZE> devicePayload;
@@ -120,23 +60,6 @@ void messageHandler(String &topic, String &payload)
     Serial.println("JSON payload: ");
     Serial.println(json_payload);
   }
-
-  EEPROM.begin(EEPROM_SIZE);
-
-  if (topic == "Armenta/Home/cmd/Bedford/uptime")
-  {
-    Device device = {
-        devicePayload["manufacturer"].as<String>(),
-        devicePayload["model"].as<String>(),
-        devicePayload["year"].as<uint16_t>(),
-        devicePayload["operation"].as<String>()};
-
-    EEPROM.put(0, device);
-    update_device(device);
-  }
-
-  EEPROM.commit();
-  EEPROM.end();
 }
 
 uint8_t connectAWS()
@@ -168,14 +91,14 @@ uint8_t connectAWS()
 
   if (!client.connected())
   {
+    // Leave space at end to clear out previous message
     Serial.println("\rAWS IoT Timeout!        ");
     return 1;
   }
 
-  client.subscribe("uptime/*");
-  Serial.print("\rConnected to AWS IoT with client ID ");
+  Serial.print("\rConnected to AWS IoT with client ID \"");
   Serial.print(THING_NAME);
-  Serial.print("!");
+  Serial.print("\"!");
   return 0;
 }
 
@@ -189,20 +112,17 @@ void MQTTProcess(void *pvParameters)
   */
 
   Measurement metrics;
-  Device device;
-  EEPROM.begin(EEPROM_SIZE);
-  EEPROM.get(0, device);
-  EEPROM.end();
   char buffer[JSON_SIZE];
   double readings[samples];
   double readingSamples;
-  uint32_t payloadCount = 0;
 
   // Initialize global JSONpayloadDoc
   update_settings(settings);
-  update_device(device);
 
-  size_t n;
+  size_t payloadSize;
+
+  char tagData[TOPIC_LENGTH];
+  const char *topic;
 
   for (;;)
   {
@@ -213,6 +133,10 @@ void MQTTProcess(void *pvParameters)
     }
     else
     {
+      // Read topic from NFC tag
+      read_nfc(tagData);
+      topic = tagData;
+
       // Get current signal sample
       for (int i = 0; i < samples; i++)
       {
@@ -244,24 +168,21 @@ void MQTTProcess(void *pvParameters)
       update_metrics(metrics);
 
       // Prepare JSON message
-      n = serializeJson(payloadDoc, buffer);
+      payloadSize = serializeJson(payloadDoc, buffer);
 
-      if (client.publish(topic, buffer, n))
+      if (client.publish(topic, buffer, payloadSize))
       {
-        payloadCount++;
         Serial.print("\rSent payload to topic \"");
         Serial.print(topic);
-        Serial.print("\" ");
-        Serial.print(payloadCount);
-        Serial.print(" times...");
+        Serial.print('"');
       }
       else
       {
-        Serial.print("\rUnable to send to ");
+        Serial.print("\rUnable to send ");
         Serial.print(buffer);
-        Serial.print(" to ");
+        Serial.print(" to \"");
         Serial.print(topic);
-        Serial.println("\"!");
+        Serial.print("\"!");
       }
       client.loop();
       // DELETING THIS DELAY WILL CRASH THE MCU
@@ -290,21 +211,15 @@ void setup()
   WiFi.mode(WIFI_STA);
   WiFi.begin(WIFI_SSID, WIFI_PASSWORD);
 
-  // TODO - Move into main() loop when tag is updated
-  read_nfc(tagData);
-  topic = tagData;
-  Serial.print("Topic: ");
-  Serial.println(topic);
-  // update_topic(topic);
-
   // Figure out a use for the second core
-  xTaskCreatePinnedToCore(MQTTProcess,  /* Task function. */
-                          "MQTT",       /* name of task. */
-                          10000,        /* Stack size of task */
-                          NULL,         /* parameter of the task */
-                          1,            /* priority of the task */
-                          &MQTTHandler, /* Task handle to keep track of created task */
-                          0);           /* pin task to core 0 */
+  xTaskCreatePinnedToCore(
+      MQTTProcess,  /* Task function. */
+      "MQTT",       /* name of task. */
+      10000,        /* Stack size of task */
+      NULL,         /* parameter of the task */
+      1,            /* priority of the task */
+      &MQTTHandler, /* Task handle to keep track of created task */
+      0);           /* pin task to core 0 */
 
   xTaskCreatePinnedToCore(
       CurrentProcess,  /* Task function. */

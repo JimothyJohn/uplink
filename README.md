@@ -1,8 +1,8 @@
-# Uptime
+# Uplink
 
 Monitor machinery with a microcontroller.
 
-### [Buy one](https://uptime.advin.io/products/uptime)
+### [Buy one](https://uptime.advin.io/products/uplink)
 
 ## Quickstart (Linux)
 
@@ -36,18 +36,18 @@ bash utils/Quickstart.sh
 
 [x] Edge-side spectrum analysis with [arduinoFFT](https://github.com/kosme/arduinoFFT)
 
-[x] Deployed via [Terraform](https://developer.hashicorp.com/terraform/downloads)
+[x] Deployed automatically via [Terraform](https://developer.hashicorp.com/terraform/downloads)
 
-[x] Conforms to [Sparkplug B](https://s3.amazonaws.com/cirrus-link-com/Sparkplug+Specification+Version+1.0.pdf) spec
+### TODO
 
-### Fix list
-
-[ ] Retrieve device data from cloud
-
-[ ] Detect NFC activity
+[ ] NEXT UP - Convert namespace to Uplink
 
 [ ] Create tests 
 
 [ ] Edge-side state determination
+
+[ ] Convert to EthClientSecure
+
+[ ] Detect NFC activity
 
 [ ] Improve Quickstart platform compatibility 

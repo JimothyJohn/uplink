@@ -81,7 +81,6 @@ void read_nfc(char *topic)
     Serial.println("NFC Tag init failed!");
   }
 
-  StaticJsonDocument<JSON_SIZE> nfcPayload;
   uint8_t newBuffer[NDEF_MAX_SIZE];
 
   st25dv.readBuffer(newBuffer);
@@ -109,15 +108,14 @@ void read_nfc(char *topic)
     Serial.println("Not a text record!");
   }
 
-  size_t payloadLength = record.getPayloadLength();
-  byte payload[payloadLength];
+  const uint8_t payloadLength = record.getPayloadLength();
+  uint8_t payload[payloadLength];
   record.getPayload(payload);
   char char_array[payloadLength];
   const char *prefixArray = "uptime/";
   memccpy(char_array, payload, 0, payloadLength);
 
   // Hard code DB ID length
-  // char *id[ID_LENGTH];
   // TODO - Properly read buffer
   for (uint8_t i = 0; i < 7; i++)
   {
@@ -128,38 +126,6 @@ void read_nfc(char *topic)
     topic[i + 7] = char_array[i + 3];
   }
   topic[TOPIC_LENGTH] = '\0';
-
-  Serial.print("NFC payload: ");
-  Serial.println(char_array);
-
-  Serial.print("ID: ");
-  Serial.println(topic);
-
-  Serial.print("Length: ");
-  Serial.println(payloadLength);
-
-  return;
-
-  /*
-  // Old JSON method (not enough space on tag)
-
-
-  DeserializationError error = deserializeJson(nfcPayload, json_payload);
-  if (error.c_str() != "Ok")
-  {
-    Serial.print("JSON Deserialization error: ");
-    Serial.println(error.c_str());
-    Serial.println("JSON payload: ");
-    Serial.println(json_payload);
-  }
-
-  if (nfcPayload["topic"] == NULL)
-  {
-    Serial.println("No topic found in JSON object");
-  }
-
-  return nfcPayload["topic"];
-  */
 }
 
 void save_topic(const char *topic)
