@@ -1,3 +1,9 @@
 [submodule "lib/ST25DV"]
 	path = lib/ST25DV
 	url = https://github.com/JimothyJohn/ST25DV.git
+[submodule "lib/NDEF"]
+	path = lib/NDEF
+	url = https://github.com/don/NDEF
+[submodule "lib/PN532"]
+	path = lib/PN532
+	url = https://github.com/Seeed-Studio/PN532.git

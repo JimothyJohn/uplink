@@ -1,6 +1,8 @@
 // Source: https://aws.amazon.com/blogs/compute/building-an-aws-iot-core-device-using-aws-serverless-and-an-esp32/
 #include <Arduino.h>
 #include <ArduinoJson.h> // Handle JSON messages
+#include <Wire.h>
+#include <ST25DVSensor.h> // Read from NFC tag
 
 #define NDEF_MAX_SIZE 256
 #define THING_NAME "uptime"
@@ -70,3 +72,9 @@ double get_current();
 void read_nfc(char *topic);
 
 void save_topic(char *topic);
+
+class MyST25DV : public ST25DV
+{
+public:
+  int readBuffer(uint8_t *newBuffer);
+};

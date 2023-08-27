@@ -1,8 +1,10 @@
 // Source: https://aws.amazon.com/blogs/compute/building-an-aws-iot-core-device-using-aws-serverless-and-an-esp32/
+#include <Arduino.h>
+#include <Wire.h>
 #include <arduinoFFT.h>   // Spectrum analysis
 #include <ArduinoJson.h>  // Handle JSON messages
 #include <EEPROM.h>       // Save config to flash
-#include "ST25DVSensor.h" // Read from NFC tag
+#include <ST25DVSensor.h> // Read from NFC tag
 #include "NfcAdapter.h"   // Read from NFC tag
 #include "uptime.h"
 
@@ -74,14 +76,13 @@ double get_current()
 
 void read_nfc(char *topic)
 {
+  uint8_t newBuffer[NDEF_MAX_SIZE];
 
   // The wire instance used can be omited in case you use default Wire instance
   if (st25dv.begin(GPO_PIN, LPD_PIN, &Wire) != 0)
   {
     Serial.println("NFC Tag init failed!");
   }
-
-  uint8_t newBuffer[NDEF_MAX_SIZE];
 
   st25dv.readBuffer(newBuffer);
 
