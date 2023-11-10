@@ -1,5 +1,5 @@
 // Source: https://aws.amazon.com/blogs/compute/building-an-aws-iot-core-device-using-aws-serverless-and-an-esp32/
-#include <Arduino.h>
+#include <SPI.h>
 #include <Wire.h>
 #include <arduinoFFT.h>   // Spectrum analysis
 #include <ArduinoJson.h>  // Handle JSON messages

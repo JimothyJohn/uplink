@@ -22,13 +22,11 @@ bash utils/Quickstart.sh
 
 ## Hardware
 
-- [Development board](https://www.olimex.com/Products/IoT/ESP32/ESP32-POE/open-source-hardware)
+- [Development board](https://www.olimex.com/Products/IoT/ESP32/ESP32-POE-ISO/open-source-hardware)
 - [Current Sensor](https://wiki.dfrobot.com/Gravity_Analog_AC_Current_Sensor__SKU_SEN0211_)
 - [NFC Tag](https://www.adafruit.com/product/4701)
 
 ### Features 
-
-[ ] [MQTT](https://mqtt.org) broker agnostic 
 
 [x] Mobile setup over [NFC](https://nfc-forum.org) 
 
@@ -36,18 +34,4 @@ bash utils/Quickstart.sh
 
 [x] Edge-side spectrum analysis with [arduinoFFT](https://github.com/kosme/arduinoFFT)
 
-[x] Deployed automatically via [Terraform](https://developer.hashicorp.com/terraform/downloads)
-
-### TODO
-
-[ ] NEXT UP - Convert namespace to Uplink
-
-[ ] Create tests 
-
-[ ] Edge-side state determination
-
-[ ] Convert to EthClientSecure
-
-[ ] Detect NFC activity
-
-[ ] Improve Quickstart platform compatibility 
+[x] Cloud deployment with [Terraform](https://developer.hashicorp.com/terraform/downloads)

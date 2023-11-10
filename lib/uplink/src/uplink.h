@@ -1,4 +1,7 @@
 // Source: https://aws.amazon.com/blogs/compute/building-an-aws-iot-core-device-using-aws-serverless-and-an-esp32/
+#ifndef UPLINK_H
+#define UPLINK_H
+
 #include <Arduino.h>
 #include <ArduinoJson.h> // Handle JSON messages
 #include <Wire.h>
@@ -81,3 +84,5 @@ class MyST25DV : public ST25DV
 public:
   int readBuffer(uint8_t *newBuffer);
 };
+
+#endif // UPLINK_H
