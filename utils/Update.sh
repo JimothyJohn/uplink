@@ -21,8 +21,8 @@ PARAMS=""
 main() {
     # Create new folders if needed
     mkdir -p .logs
-    # Remove old uptime library
-    rm -f -r .pio/libdeps/esp-wrover-kit/uptime
+    # Remove old uplink library
+    rm -f -r .pio/libdeps/esp-wrover-kit/uplink
     # Upload new firmware and log output
     $PIO run -t upload | tee $LOG_DIR/upload.txt
     

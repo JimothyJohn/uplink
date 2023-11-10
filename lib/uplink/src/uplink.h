@@ -5,9 +5,10 @@
 #include <ST25DVSensor.h> // Read from NFC tag
 
 #define NDEF_MAX_SIZE 256
-#define THING_NAME "uptime"
 #define SDA_PIN 13
 #define SCL_PIN 16
+
+static bool eth_connected = false;
 
 // For Arduino Zero, Due, MKR Family, ESP32, etc. 3V3 controllers, change VREF to 3.3
 static const double VREF = 3.3;
@@ -73,7 +74,7 @@ double get_current();
 
 uint8_t read_nfc(char *topic);
 
-void save_topic(char *topic);
+void messageHandler(String &topic, String &payload);
 
 class MyST25DV : public ST25DV
 {

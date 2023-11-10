@@ -3,10 +3,9 @@
 #include <Wire.h>
 #include <arduinoFFT.h>   // Spectrum analysis
 #include <ArduinoJson.h>  // Handle JSON messages
-#include <EEPROM.h>       // Save config to flash
 #include <ST25DVSensor.h> // Read from NFC tag
 #include "NfcAdapter.h"   // Read from NFC tag
-#include "uptime.h"
+#include "uplink.h"
 
 Measurement run_fft(double vReal[], Settings settings)
 {
@@ -135,10 +134,18 @@ uint8_t read_nfc(char *topic)
   return 1;
 }
 
-void save_topic(const char *topic)
+void messageHandler(String &topic, String &payload)
 {
-  EEPROM.begin(EEPROM_SIZE);
-  EEPROM.put(0, topic);
-  EEPROM.commit();
-  EEPROM.end();
+  StaticJsonDocument<JSON_SIZE> devicePayload;
+  size_t n = sizeof(payload);
+  char json_payload[n];
+
+  DeserializationError error = deserializeJson(devicePayload, payload);
+  if (error.c_str() != "Ok")
+  {
+    Serial.print("JSON Deserialization error: ");
+    Serial.println(error.c_str());
+    Serial.println("JSON payload: ");
+    Serial.println(json_payload);
+  }
 }

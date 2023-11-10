@@ -1,11 +1,10 @@
 // Load relevant libraries
-#include <Arduino.h>`
 #include <Wire.h>`
 #include <WiFiClientSecure.h>
+#include <ETH.h>
 #include <MQTTClient.h>  // Enable MQTT
 #include <ArduinoJson.h> // Handle JSON messages
-#include <EEPROM.h>      // Handle JSON messages
-#include "uptime.h"      // Project library
+#include "uplink.h"      // Project library
 #include "secrets.h"     // AWS IoT credentials
 
 // Dual-core tasks
@@ -16,8 +15,10 @@ TaskHandle_t CurrentHandler;
 WiFiClientSecure net = WiFiClientSecure();
 MQTTClient client = MQTTClient(JSON_SIZE);
 
+// MQTT Message
 StaticJsonDocument<JSON_SIZE> payloadDoc;
 
+// Default measurement settings
 const Settings settings = {
     16,
     128,
@@ -27,47 +28,38 @@ const Settings settings = {
 // Measurement parameters
 const uint8_t samplingDelay = static_cast<uint8_t>(1000 / settings.fs / settings.smoothingFactor);
 
-void update_metrics(Measurement metrics)
+// Ethernet event handler
+void EthEvent(WiFiEvent_t event)
 {
-  payloadDoc["metrics"]["energy"] = metrics.energy;
-  payloadDoc["metrics"]["a_max"] = metrics.a_max;
-  payloadDoc["metrics"]["a_rms"] = metrics.a_rms;
-  payloadDoc["metrics"]["freq_max"] = metrics.freq_max;
-  payloadDoc["metrics"]["freq_rms"] = metrics.freq_rms;
-  payloadDoc["metrics"]["peak_hz"] = metrics.peak_hz;
-}
-
-void update_settings(Settings settings)
-{
-  payloadDoc["settings"]["fs"] = settings.fs;
-  payloadDoc["settings"]["samples"] = settings.samples;
-  payloadDoc["settings"]["a_lim"] = settings.a_lim;
-  EEPROM.begin(EEPROM_SIZE);
-  EEPROM.put(Config::SETTINGS, settings);
-  EEPROM.commit();
-  EEPROM.end();
-}
-
-void messageHandler(String &topic, String &payload)
-{
-  StaticJsonDocument<JSON_SIZE> devicePayload;
-  size_t n = sizeof(payload);
-  char json_payload[n];
-
-  DeserializationError error = deserializeJson(devicePayload, payload);
-  if (error.c_str() != "Ok")
+  switch (event)
   {
-    Serial.print("JSON Deserialization error: ");
-    Serial.println(error.c_str());
-    Serial.println("JSON payload: ");
-    Serial.println(json_payload);
+  case ARDUINO_EVENT_ETH_START:
+    ETH.setHostname(THING_NAME);
+    break;
+  case ARDUINO_EVENT_ETH_CONNECTED:
+    break;
+  case ARDUINO_EVENT_ETH_GOT_IP:
+    Serial.print("\rConnected to network!");
+    eth_connected = true;
+    break;
+  case ARDUINO_EVENT_ETH_DISCONNECTED:
+    Serial.println("ETH Disconnected");
+    eth_connected = false;
+    break;
+  case ARDUINO_EVENT_ETH_STOP:
+    Serial.println("ETH Stopped");
+    eth_connected = false;
+    break;
+  default:
+    break;
   }
 }
 
+// MQTT Broker connection
 uint8_t connectAWS()
 {
-  Serial.print("\rConnecting to Wi-Fi...");
-  while (WiFi.status() != WL_CONNECTED)
+  Serial.print("Connecting to network...");
+  while (!eth_connected)
   {
     Serial.print(".");
     delay(1000);
@@ -86,9 +78,9 @@ uint8_t connectAWS()
 
   Serial.print("\rConnecting to AWS IOT with client ID: ");
   Serial.print(THING_NAME);
+  Serial.print("...");
   while (!client.connect(THING_NAME))
   {
-
     Serial.print(".");
     delay(1000);
   }
@@ -96,12 +88,13 @@ uint8_t connectAWS()
   if (!client.connected())
   {
     // Leave space at end to clear out previous message
-    Serial.println("\rAWS IoT Timeout!        ");
+    Serial.println("\rAWS IoT Timeout!                ");
     return 0;
   }
 
   Serial.print("\rConnected to AWS IOT with client ID: ");
-  Serial.println(THING_NAME);
+  Serial.print(THING_NAME);
+  Serial.print("!                   ");
 
   return 1;
 }
@@ -121,7 +114,9 @@ void MQTTProcess(void *pvParameters)
   double readingSamples;
 
   // Initialize global JSONpayloadDoc
-  update_settings(settings);
+  payloadDoc["settings"]["fs"] = settings.fs;
+  payloadDoc["settings"]["samples"] = settings.samples;
+  payloadDoc["settings"]["a_lim"] = settings.a_lim;
 
   size_t payloadSize;
 
@@ -133,7 +128,10 @@ void MQTTProcess(void *pvParameters)
     // Make sure MQTT client is connected
     if (!client.connected())
     {
-      connectAWS();
+      if (!connectAWS())
+      {
+        Serial.println("Unable to connect to AWS!");
+      }
     }
     else
     {
@@ -141,8 +139,6 @@ void MQTTProcess(void *pvParameters)
       if (!read_nfc(tagData))
       {
         delay(1000);
-        Serial.print("Current: ");
-        Serial.println(get_current());
         continue;
       }
       topic = tagData;
@@ -163,7 +159,8 @@ void MQTTProcess(void *pvParameters)
 
       // Analyze signal
       // metrics = run_fft(readings, settings);
-      // Test metrics
+
+      // Test metrics (replace with code above)
       // Creates a random float between 0 and 3
       double samples[] = {0.0, 1.0, 5.0};
       uint8_t randInt = random(0, 3);
@@ -175,14 +172,22 @@ void MQTTProcess(void *pvParameters)
           0.0,
           0.0};
 
-      update_metrics(metrics);
+      // Update <etrics
+      payloadDoc["metrics"]["energy"] = metrics.energy;
+      payloadDoc["metrics"]["a_max"] = metrics.a_max;
+      payloadDoc["metrics"]["a_rms"] = metrics.a_rms;
+      payloadDoc["metrics"]["freq_max"] = metrics.freq_max;
+      payloadDoc["metrics"]["freq_rms"] = metrics.freq_rms;
+      payloadDoc["metrics"]["peak_hz"] = metrics.peak_hz;
 
       // Prepare JSON message
       payloadSize = serializeJson(payloadDoc, buffer);
 
       if (client.publish(topic, buffer, payloadSize))
       {
-        Serial.print("\rSent payload to topic \"");
+        // Print 24 spaces to clear the line
+        Serial.print("\r                                            ");
+        Serial.print("\rSending payload to topic \"");
         Serial.print(topic);
         Serial.print('"');
       }
@@ -192,7 +197,7 @@ void MQTTProcess(void *pvParameters)
         Serial.print(buffer);
         Serial.print(" to \"");
         Serial.print(topic);
-        Serial.print("\"!");
+        Serial.print("\"!            ");
       }
       client.loop();
       // DELETING THIS DELAY WILL CRASH THE MCU
@@ -218,10 +223,11 @@ void setup()
     ;
   delay(2000);
 
-  WiFi.mode(WIFI_STA);
-  WiFi.begin(WIFI_SSID, WIFI_PASSWORD);
+  WiFi.onEvent(EthEvent);
+  ETH.begin();
 
-  Wire.begin(SDA_PIN, SCL_PIN); // Initialize I2C bus with SDA_PIN and SCL_PIN
+  // Initialize I2C bus with SDA_PIN and SCL_PIN
+  Wire.begin(SDA_PIN, SCL_PIN);
 
   // Figure out a use for the second core
   xTaskCreatePinnedToCore(

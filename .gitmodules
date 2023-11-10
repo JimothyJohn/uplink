@@ -4,6 +4,3 @@
 [submodule "lib/NDEF"]
 	path = lib/NDEF
 	url = https://github.com/don/NDEF
-[submodule "lib/PN532"]
-	path = lib/PN532
-	url = https://github.com/Seeed-Studio/PN532.git
