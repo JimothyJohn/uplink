@@ -6,6 +6,8 @@
 
 #define NDEF_MAX_SIZE 256
 #define THING_NAME "uptime"
+#define SDA_PIN 13
+#define SCL_PIN 16
 
 // For Arduino Zero, Due, MKR Family, ESP32, etc. 3V3 controllers, change VREF to 3.3
 static const double VREF = 3.3;
@@ -69,7 +71,7 @@ Measurement run_fft(double vReal[], Settings settings);
 
 double get_current();
 
-void read_nfc(char *topic);
+uint8_t read_nfc(char *topic);
 
 void save_topic(char *topic);
 

@@ -74,7 +74,7 @@ double get_current()
   return voltageVirtualValue * ACRANGE;
 }
 
-void read_nfc(char *topic)
+uint8_t read_nfc(char *topic)
 {
   uint8_t newBuffer[NDEF_MAX_SIZE];
 
@@ -82,6 +82,7 @@ void read_nfc(char *topic)
   if (st25dv.begin(GPO_PIN, LPD_PIN, &Wire) != 0)
   {
     Serial.println("NFC Tag init failed!");
+    return 0;
   }
 
   st25dv.readBuffer(newBuffer);
@@ -91,10 +92,12 @@ void read_nfc(char *topic)
   if (num_records > 1)
   {
     Serial.println("More than one record present!");
+    return 0;
   }
   else if (num_records == 0)
   {
     Serial.println("No records present!");
+    return 0;
   }
 
   NdefRecord record = msg.getRecord(0);
@@ -102,11 +105,13 @@ void read_nfc(char *topic)
   if (record.getTnf() != 1)
   {
     Serial.println("Not a known type!");
+    return 0;
   }
 
   if (record.getType() != "T")
   {
     Serial.println("Not a text record!");
+    return 0;
   }
 
   const uint8_t payloadLength = record.getPayloadLength();
@@ -127,6 +132,7 @@ void read_nfc(char *topic)
     topic[i + 7] = char_array[i + 3];
   }
   topic[TOPIC_LENGTH] = '\0';
+  return 1;
 }
 
 void save_topic(const char *topic)

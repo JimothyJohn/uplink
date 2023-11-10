@@ -1,6 +1,5 @@
 // Load relevant libraries
 #include <Arduino.h>`
-#include <Wire.h>`
 #include <WiFiClientSecure.h>
 #include <MQTTClient.h>  // Enable MQTT
 #include <ArduinoJson.h> // Handle JSON messages
@@ -88,7 +87,7 @@ uint8_t connectAWS()
   Serial.print(THING_NAME);
   while (!client.connect(THING_NAME))
   {
-
+    
     Serial.print(".");
     delay(1000);
   }
@@ -138,8 +137,7 @@ void MQTTProcess(void *pvParameters)
     else
     {
       // Read topic from NFC tag
-      if (!read_nfc(tagData))
-      {
+      if(!read_nfc(tagData)) {
         delay(1000);
         Serial.print("Current: ");
         Serial.println(get_current());
@@ -220,8 +218,6 @@ void setup()
 
   WiFi.mode(WIFI_STA);
   WiFi.begin(WIFI_SSID, WIFI_PASSWORD);
-
-  Wire.begin(SDA_PIN, SCL_PIN); // Initialize I2C bus with SDA_PIN and SCL_PIN
 
   // Figure out a use for the second core
   xTaskCreatePinnedToCore(

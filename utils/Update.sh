@@ -20,11 +20,9 @@ PARAMS=""
 
 main() {
     # Create new folders if needed
-    mkdir -p {.logs,lib/ST25DV}
+    mkdir -p .logs
     # Remove old uptime library
     rm -f -r .pio/libdeps/esp-wrover-kit/uptime
-    # Copy forked ST25DV library
-    cp -r ../ST25DV/* lib/ST25DV
     # Upload new firmware and log output
     $PIO run -t upload | tee $LOG_DIR/upload.txt
     

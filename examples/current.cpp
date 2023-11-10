@@ -14,8 +14,8 @@ By Nick Armenta<nick@advin.io>
 */
 
 #include <Arduino.h>
-const uint8_t ACPin = 0;   // set arduino signal read pin
-#define ACTectionRange 20; // set Non-invasive AC Current Sensor tection range
+const uint8_t ACPin = 32; // set arduino signal read pin
+#define ACTectionRange 5; // set Non-invasive AC Current Sensor tection range
 
 // VREF: Analog reference
 // For Arduino UNO, Leonardo and mega2560, etc. change VREF to 5
@@ -61,5 +61,5 @@ void loop()
     // https://docs.edgeimpulse.com/docs/edge-impulse-cli/cli-data-forwarder#protocol
     Serial.println(ACCurrentValue);
     // 50ms is ~18Hz, the maximum sample rate of Edge Impulse
-    delay(50);
+    delay(100);
 }
